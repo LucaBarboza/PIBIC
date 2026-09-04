@@ -4,6 +4,7 @@ import re
 from google import genai
 from google.genai import types
 from schemas import AulaUnificadaELapidada
+from client_factory import get_genai_client
 
 # ==============================================================================
 # FALLBACK DE SEGURANÇA PARA A CHAVE DE API (GEMINI_API_KEY)
@@ -40,10 +41,7 @@ def carregar_chave_api():
     return False
 
 def lapidar_conteudo_global(payload_bruto: dict, logger=None):
-    # Garante a inicialização da chave
-    carregar_chave_api()
-    os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", "vertex-key.json")
-    client = genai.Client(vertexai=True, location="us-central1")
+    client = get_genai_client()
 
     dados_entrada_str = json.dumps(payload_bruto, ensure_ascii=False)
 
@@ -66,7 +64,7 @@ def lapidar_conteudo_global(payload_bruto: dict, logger=None):
             
         def chamar_orquestrador():
             return client.models.generate_content(
-                model="gemini-2.5-pro",
+                model="gemini-pro-latest",
                 contents=[dados_entrada_str, prompt_editorial],
                 config=config_editorial
             )
@@ -111,7 +109,7 @@ def formatar_latex_final(aula_json: dict, client) -> dict:
     try:
         dados_str = json.dumps(aula_json, ensure_ascii=False)
         resposta_formatada = client.models.generate_content(
-            model="gemini-2.5-pro",
+            model="gemini-pro-latest",
             contents=[dados_str, PROMPT_FORMATADOR_LATEX],
             config=config_formatador
         )
@@ -122,15 +120,13 @@ def formatar_latex_final(aula_json: dict, client) -> dict:
         return aula_json
 
 def expandir_subtopico_para_prosa_livro(dados_subtopico: dict) -> str:
-    carregar_chave_api()
-    os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", "vertex-key.json")
-    client = genai.Client(vertexai=True, location="us-central1")
+    client = get_genai_client()
     
     from prompts import PROMPT_PROFESSOR_EXPANSOR, DICIONARIO_LATEX
     prompt = PROMPT_PROFESSOR_EXPANSOR.replace("{dicionario_latex}", DICIONARIO_LATEX)
     
     resposta = client.models.generate_content(
-        model="gemini-2.5-pro",
+        model="gemini-pro-latest",
         contents=[json.dumps(dados_subtopico, ensure_ascii=False), prompt],
         config=types.GenerateContentConfig(
             response_mime_type="text/plain"

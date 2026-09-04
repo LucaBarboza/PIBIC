@@ -5,12 +5,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 import latex_sanitizer
-
-def carregar_chave_api():
-    load_dotenv()
-    if "GEMINI_API_KEY" in os.environ and os.environ["GEMINI_API_KEY"].strip():
-        return True
-    return False
+from client_factory import get_genai_client
 
 def detectar_anomalias_estruturais_katex(texto: str) -> list:
     """
@@ -166,18 +161,15 @@ def substituir_no_caminho(obj, caminho: str, novo_valor: str) -> bool:
 
     return False
 
-def reparar_anomalias_cirurgico(aula_sanitizada: dict, anomalias: list, logger=None, target_model="gemini-2.5-flash") -> dict:
+def reparar_anomalias_cirurgico(aula_sanitizada: dict, anomalias: list, logger=None, target_model="gemini-flash-latest") -> dict:
     """
     Envia APENAS as anomalias capturadas no Passo 1 para o LLM e aplica as correções cirurgicamente
     no JSON original sem tocar no resto da aula. Usa fallback imediato para nunca travar o pipeline.
     """
-    carregar_chave_api()
-    os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", "vertex-key.json")
-    
     try:
-        client = genai.Client(vertexai=True, location="us-central1")
+        client = get_genai_client()
     except Exception as e:
-        print(f" [AVISO] Falha ao inicializar Vertex Client no validador: {e}. Mantendo versão determinística.")
+        print(f" [AVISO] Falha ao inicializar Gemini Client no validador: {e}. Mantendo versão determinística.")
         return aula_sanitizada
     
     from prompts import DICIONARIO_LATEX

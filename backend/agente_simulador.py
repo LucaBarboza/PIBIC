@@ -4,6 +4,7 @@ import re
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+from client_factory import get_genai_client
 
 def carregar_chave_api():
     load_dotenv()
@@ -141,9 +142,7 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, logger=None) -> st
     """
     Gera um código HTML/JS completo para uma simulação interativa usando Gemini Pro com Structured Outputs.
     """
-    carregar_chave_api()
-    os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", "vertex-key.json")
-    client = genai.Client(vertexai=True, location="us-central1")
+    client = get_genai_client()
     
     prompt = PROMPT_ENGENHEIRO_SIMULACAO.format(
         tema_aula=tema_aula,
@@ -161,7 +160,7 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, logger=None) -> st
         
         def chamar_simulador():
             return client.models.generate_content(
-                model="gemini-2.5-pro",
+                model="gemini-pro-latest",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",

@@ -3,7 +3,7 @@ import json
 from google import genai
 from google.genai import types
 from prompts import PROMPT_MACRO_ROTEIRISTA
-
+from client_factory import get_genai_client
 from pydantic import BaseModel, Field
 
 class AulaCronograma(BaseModel):
@@ -18,12 +18,7 @@ class CronogramaCompleto(BaseModel):
 
 class MacroRoteirista:
     def __init__(self):
-        self.api_key = os.environ.get("GEMINI_API_KEY")
-        
-        # Novo cliente do google-genai
-        os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", "vertex-key.json")
-        self.client = genai.Client(vertexai=True, location="us-central1")
-        
+        self.client = get_genai_client()
         self.system_instruction = PROMPT_MACRO_ROTEIRISTA
 
     def gerar_cronograma(self, ementa_texto: str, instrucoes_personalizadas: str = None, tipo_carga_horaria: str = "padrao_30", permitir_aprofundamento: bool = False, max_aulas: int = 30) -> list:
@@ -64,7 +59,7 @@ DIRETRIZ DE APROFUNDAMENTO (MANDATÓRIO):
 
             def chamar_macro():
                 return self.client.models.generate_content(
-                    model="gemini-2.5-pro",
+                    model="gemini-pro-latest",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=self.system_instruction,

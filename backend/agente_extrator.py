@@ -5,6 +5,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from schemas import RegraOverride
+from client_factory import get_genai_client
 
 load_dotenv()
 
@@ -40,8 +41,7 @@ def extrair_regras_override(texto_documento: str, logger=None) -> Optional[Dict]
     from gemini_retry import executar_chamada_com_retry
 
     try:
-        os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", "vertex-key.json")
-        client = genai.Client(vertexai=True, location="us-central1")
+        client = get_genai_client()
         
         prompt = PROMPT_EXTRATOR.format(texto_documento=texto_documento)
         

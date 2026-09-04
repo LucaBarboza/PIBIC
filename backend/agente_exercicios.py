@@ -4,6 +4,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from schemas import CadernoExerciciosValidado
+from client_factory import get_genai_client
 
 def carregar_chave_api():
     load_dotenv()
@@ -29,10 +30,8 @@ def gerar_caderno_exercicios(conteudo_aula_json: dict, logger=None, modelo_llm="
     Recebe a aula unificada e lapidada e gera o Caderno de Exercícios correspondente,
     garantindo a saída como um dicionário JSON compatível com o schema CadernoExerciciosValidado.
     """
-    carregar_chave_api()
-    os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", "vertex-key.json")
-    client = genai.Client(vertexai=True, location="us-central1")
-    target_model = "gemini-2.5-pro" if str(modelo_llm) == "pro" else "gemini-2.5-flash"
+    client = get_genai_client()
+    target_model = "gemini-pro-latest" if str(modelo_llm) == "pro" else "gemini-flash-latest"
     
     # Reduzindo o conteúdo apenas para os textos essenciais para economizar tokens
     resumo_aula = f"Tema: {conteudo_aula_json.get('tema_global', 'Aula')}\n"

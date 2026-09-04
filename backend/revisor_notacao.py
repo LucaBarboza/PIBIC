@@ -9,6 +9,7 @@ from typing import Optional
 
 # Importamos o contrato do subtópico para o Revisor analisar
 from schemas import SubtopicoValidado
+from client_factory import get_genai_client
 
 # ==============================================================================
 # FALLBACK DE SEGURANÇA PARA A CHAVE DE API (GEMINI_API_KEY)
@@ -52,11 +53,11 @@ carregar_chave_api()
 # ==============================================================================
 class DecisaoRevisao(BaseModel):
     aprovado: bool = Field(
-        description="Defina como True se o conteúdo for profundo, correto e seguir 100% da notação. Defina como False se precisar de correções."
+        description="True se o conteúdo está correto e consistente com as diretrizes. False se precisa de correções."
     )
-    comentario_correcao: Optional[str] = Field(
+    feedback_melhoria: Optional[str] = Field(
         default=None,
-        description="Se aprovado for False, escreva um laudo detalhado apontando onde o conteúdo falhou (notação errada, falta de rigor, explicação rasa) e o que o Escritor deve refazer."
+        description="Explicação detalhada dos pontos que violaram as diretrizes ou que contêm erros de notação."
     )
     conteudo_corrigido: Optional[SubtopicoValidado] = Field(
         default=None,
@@ -67,13 +68,7 @@ class DecisaoRevisao(BaseModel):
 # FUNÇÃO DE AUDITORIA DO SUBTÓPICO
 # ==============================================================================
 def auditar_subtopico_local(bloco_bruto_dict: dict, diretrizes_texto: str, logger=None, sub_idx=None, sub_tentativa=None) -> DecisaoRevisao:
-    # Garante que temos a chave configurada
-    
-    try:
-        os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", "vertex-key.json")
-        client = genai.Client(vertexai=True, location="us-central1")
-    except Exception as e:
-        raise e
+    client = get_genai_client()
     
     bloco_bruto_str = json.dumps(bloco_bruto_dict, ensure_ascii=False, indent=2)
 
@@ -92,7 +87,7 @@ def auditar_subtopico_local(bloco_bruto_dict: dict, diretrizes_texto: str, logge
     try:
         def chamar_revisor():
             return client.models.generate_content(
-                model="gemini-2.5-pro",
+                model="gemini-pro-latest",
                 contents=[bloco_bruto_str, prompt_revisor],
                 config=config_revisor
             )

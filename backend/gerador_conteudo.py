@@ -11,48 +11,10 @@ from typing import List
 
 # Importando os schemas estruturados que criamos no arquivo anterior
 from schemas import SubtopicoValidado, FonteRDetalhada, SubtopicoRoteiro, RoteiroCompletoAula
+from client_factory import get_genai_client
 # Importamos a função do revisor local para auditoria
 from revisor_notacao import auditar_subtopico_local
 import latex_sanitizer
-
-# ==============================================================================
-# FALLBACK DE SEGURANÇA PARA A CHAVE DE API (GEMINI_API_KEY)
-# ==============================================================================
-def carregar_chave_api():
-    """Garante a leitura da API key a partir do ambiente, do st.secrets (Streamlit Cloud) ou do secrets.toml local."""
-    if "GEMINI_API_KEY" in os.environ and os.environ["GEMINI_API_KEY"].strip():
-        return True
-        
-    # Tenta obter do st.secrets do Streamlit
-    try:
-        import streamlit as st
-        if "GEMINI_API_KEY" in st.secrets:
-            val = st.secrets["GEMINI_API_KEY"]
-            if val and val.strip():
-                os.environ["GEMINI_API_KEY"] = val.strip()
-                return True
-    except Exception:
-        pass
-        
-    # Tenta ler do secrets.toml da pasta local
-    path = os.path.join(".streamlit", "secrets.toml")
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                for linha in f:
-                    if "GEMINI_API_KEY" in linha:
-                        match = re.search(r'(?:GEMINI_API_KEY\s*=\s*["\'])(.*?)(?:["\'])', linha)
-                        if match:
-                            os.environ["GEMINI_API_KEY"] = match.group(1).strip()
-                            print(f"[KEY] Chave de API carregada com sucesso a partir de '{path}'.")
-                            return True
-        except Exception as e:
-            print(f"[ALERTA] Erro ao tentar ler {path}: {e}")
-                
-    return False
-
-# Inicializa o carregamento da chave de API
-carregar_chave_api()
 
 # ==============================================================================
 # FUNÇÃO PRINCIPAL DE ORQUESTRAÇÃO DE CONTEÚDO
@@ -68,10 +30,9 @@ def gerar_conteudo_aula(nome_professor: str, codigo_disciplina: str, tema_solici
         logger.log("Gerador de Conteúdo: Iniciando elaboração do macro roteiro...", "info")
     
     try:
-        os.environ.setdefault("GOOGLE_APPLICATION_CREDENTIALS", "vertex-key.json")
-        client = genai.Client(vertexai=True, location="us-central1")
-        modelo_roteirista = "gemini-2.5-pro"
-        modelo_escritor = "gemini-2.5-pro" if str(modelo_llm) == "pro" else "gemini-2.5-flash"
+        client = get_genai_client()
+        modelo_roteirista = "gemini-pro-latest"
+        modelo_escritor = "gemini-pro-latest" if str(modelo_llm) == "pro" else "gemini-flash-latest"
 
     except Exception as e:
         if logger:
