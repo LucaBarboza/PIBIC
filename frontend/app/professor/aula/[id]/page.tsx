@@ -470,9 +470,22 @@ export default function ProfessorSemesterViewer() {
                 );
               })
             ) : (
-               <div className="text-center p-6 text-slate-400 text-sm">
-                 O cronograma ainda não foi estruturado pelo Coordenador.
-               </div>
+                <div className="text-center p-6 text-slate-500 text-sm">
+                  {classroom?.status === "creating_semester" || classroom?.status === "fatiando_ementa" ? (
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      <p className="font-semibold text-slate-700">Estruturando Cronograma...</p>
+                      <p className="text-xs text-slate-400">A IA está fatiando a ementa oficial e montando o plano de ensino.</p>
+                    </div>
+                  ) : classroom?.status?.startsWith("erro") ? (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
+                      <p className="font-bold mb-1">Erro no Processamento</p>
+                      <p className="text-[11px]">{classroom.status}</p>
+                    </div>
+                  ) : (
+                    <p className="text-slate-400">O cronograma ainda não foi estruturado pelo Coordenador.</p>
+                  )}
+                </div>
             )}
           </div>
           <div className="p-4 mt-auto border-t border-slate-200">
