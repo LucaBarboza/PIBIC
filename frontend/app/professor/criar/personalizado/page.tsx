@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import DisciplinaSelect from "@/components/DisciplinaSelect";
 
 export default function CriarSalaPersonalizada() {
   const router = useRouter();
@@ -311,20 +312,11 @@ export default function CriarSalaPersonalizada() {
                 </div>
             </div>
 
-            <div className="mb-8">
-                <label className="block text-sm font-bold text-slate-700 mb-2">Disciplina da Grade Oficial</label>
-                <select
-                className="w-full p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-slate-800 bg-slate-50"
-                value={selectedDisciplina}
-                onChange={(e) => setSelectedDisciplina(e.target.value)}
-                >
-                {disciplinas.map((d) => (
-                    <option key={d.id_disciplina} value={d.id_disciplina}>
-                    {d.id_disciplina} - {d.nome}
-                    </option>
-                ))}
-                </select>
-            </div>
+            <DisciplinaSelect
+              disciplinas={disciplinas}
+              value={selectedDisciplina}
+              onChange={setSelectedDisciplina}
+            />
 
 
             <div className="mb-8">
