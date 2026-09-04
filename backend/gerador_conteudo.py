@@ -97,6 +97,7 @@ Cada item da lista deve focar intensamente em um único conceito específico, ga
 3. Formalismo Teórico Exclusivo: O foco deve ser a intuição conceitual, o formalismo matemático e as deduções analíticas. 
 É TERMINANTEMENTE PROIBIDO incluir, sugerir ou criar componentes de programação, sintaxe de código ou laboratórios computacionais 
 (como R, Python, SAS ou Julia).
+4. Respeito Estrito às Diretrizes e Material do Professor: Se o professor forneceu material de apoio em PDF, anotações de aula, tópicos obrigatórios ou restrições de tópicos proibidos nas [DIRETRIZES_E_MATERIAL_DO_PROFESSOR], incorpore-os obrigatoriamente na divisão dos subtópicos, garantindo que nenhum tópico obrigatório seja esquecido e nenhum tópico proibido seja incluído.
 
 ---
 
@@ -121,14 +122,13 @@ Cada item da lista deve focar intensamente em um único conceito específico, ga
 ### ENTRADAS DO USUÁRIO
 - [EMENTA]: {ementa_texto}
 - [TÓPICO_SOLICITADO]: {tema_solicitado}
-- [DIRETRIZES_E_MATERIAL_DO_PROFESSOR]: {diretrizes_texto}
+- [DIRETRIZES_E_MATERIAL_DO_PROFESSOR]:
+{diretrizes_texto or 'Nenhuma diretriz adicional.'}
 """
     
     contents_roteirista = []
     if ementa_texto:
         contents_roteirista.append(f"Esta é a ementa oficial:\n{ementa_texto}")
-    if diretrizes_texto:
-        contents_roteirista.append(f"Diretrizes e material do professor:\n{diretrizes_texto}")
     contents_roteirista.append(prompt_roteirista)
 
     from gemini_retry import executar_chamada_com_retry

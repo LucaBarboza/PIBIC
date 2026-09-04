@@ -35,6 +35,12 @@ def sanitize_display_math(content: str) -> str:
     if r'\begin{' not in c and r'\\' in c:
         c = "\\begin{aligned}\n" + c + "\n\\end{aligned}"
     
+    # 8. Se contiver múltiplos axiomas/equações separados por \quad ou \qquad, converte em \begin{aligned} com \\
+    if r'\begin{' not in c and (r'\qquad' in c or r'\quad' in c):
+        c_lines = [l.strip() for l in re.split(r'\\qquad|\\quad', c) if l.strip()]
+        if len(c_lines) > 1:
+            c = "\\begin{aligned}\n" + " \\\\\n".join(c_lines) + "\n\\end{aligned}"
+    
     return c.strip()
 
 def sanitize_inline_math(content: str) -> str:

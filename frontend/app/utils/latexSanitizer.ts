@@ -70,11 +70,6 @@ export function sanitizeLatex(text: string): string {
   processed = processed.replace(/\\\[/g, '\n$$\n').replace(/\\\]/g, '\n$$\n');
   processed = processed.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
 
-  // 2.5 Desaninha equações onde o modelo abriu $ antes da fórmula e depois colocou $$ para a matriz
-  processed = processed.replace(/(?<!\\)\$\s*([^$\n]*?)\s*\n*\$\$([\s\S]*?)\$\$\s*(?<!\\)\$/g, '\n$$\n$1 $2\n$$\n');
-  processed = processed.replace(/(?<!\\)\$\s*\$\$/g, '\n$$\n');
-  processed = processed.replace(/\$\$\s*(?<!\\)\$/g, '\n$$\n');
-
   // 3. Se a string contiver \begin{aligned} ou \begin{...} sem $$, envolve em $$
   if (!processed.includes('$$') && processed.includes('\\begin{')) {
     processed = processed.replace(/(\\begin\{[a-zA-Z*]+\}[\s\S]*?\\end\{[a-zA-Z*]+\})/g, '\n$$\n$1\n$$\n');
