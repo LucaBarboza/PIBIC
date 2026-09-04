@@ -187,9 +187,16 @@ def processar_semestre_background(req: SemestreRequest):
                 print("[BACKGROUND] Modo Crie do Seu Jeito Automático: Usando PDF do professor como ementa.")
                 storage.update_classroom(req.id_sala, {"status": "fatiando_ementa_pdf"})
                 macro = MacroRoteirista()
+                diretrizes_macro = ""
+                if req.instrucoes_personalizadas:
+                    diretrizes_macro += f"Instruções e Persona do Professor:\n{req.instrucoes_personalizadas}\n\n"
+                if req.arquivo_global_pdf:
+                    diretrizes_macro += f"Material / PDF Completo do Professor:\n{req.arquivo_global_pdf}\n\n"
+                
                 cronograma = macro.gerar_cronograma(
-                    ementa_texto=req.arquivo_global_pdf, 
+                    ementa_texto=req.arquivo_global_pdf or ementa_texto, 
                     instrucoes_personalizadas=req.instrucoes_personalizadas, 
+                    diretrizes_texto=diretrizes_macro,
                     tipo_carga_horaria=req.tipo_carga_horaria,
                     permitir_aprofundamento=req.permitir_aprofundamento,
                     max_aulas=req.max_aulas
@@ -202,10 +209,17 @@ def processar_semestre_background(req: SemestreRequest):
             log_debug(req.id_sala, "Acionando Macro Roteirista para fatiar o semestre...")
             storage.update_classroom(req.id_sala, {"status": "fatiando_ementa"})
             
+            diretrizes_macro = ""
+            if req.instrucoes_personalizadas:
+                diretrizes_macro += f"Instruções e Persona do Professor:\n{req.instrucoes_personalizadas}\n\n"
+            if req.arquivo_global_pdf:
+                diretrizes_macro += f"Material / PDF Completo do Professor:\n{req.arquivo_global_pdf}\n\n"
+
             macro = MacroRoteirista()
             cronograma = macro.gerar_cronograma(
                 ementa_texto=ementa_texto, 
                 instrucoes_personalizadas=req.instrucoes_personalizadas, 
+                diretrizes_texto=diretrizes_macro,
                 tipo_carga_horaria=req.tipo_carga_horaria,
                 permitir_aprofundamento=req.permitir_aprofundamento,
                 max_aulas=req.max_aulas

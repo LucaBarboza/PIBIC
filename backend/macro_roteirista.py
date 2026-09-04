@@ -21,7 +21,7 @@ class MacroRoteirista:
         self.client = get_genai_client()
         self.system_instruction = PROMPT_MACRO_ROTEIRISTA
 
-    def gerar_cronograma(self, ementa_texto: str, instrucoes_personalizadas: str = None, tipo_carga_horaria: str = "padrao_30", permitir_aprofundamento: bool = False, max_aulas: int = 30, modelo_llm: str = "hibrido", tracker = None) -> list:
+    def gerar_cronograma(self, ementa_texto: str, instrucoes_personalizadas: str = None, diretrizes_texto: str = None, tipo_carga_horaria: str = "padrao_30", permitir_aprofundamento: bool = False, max_aulas: int = 30, modelo_llm: str = "hibrido", tracker = None) -> list:
         
         instrucao_carga = ""
         if tipo_carga_horaria == "padrao_30" or tipo_carga_horaria == "manual":
@@ -37,19 +37,22 @@ class MacroRoteirista:
         else:
             instrucao_aprofundamento = "É ESTRITAMENTE PROIBIDO adicionar conteúdos ou aulas sobre tópicos que não constam na ementa. O campo 'aula_complementar' deve ser sempre false."
 
-        prompt = f"""
-Por favor, analise a ementa abaixo e crie um cronograma balanceado.
+        conteudo_diretrizes = diretrizes_texto or instrucoes_personalizadas or "Nenhuma diretriz adicional."
 
-Ementa Oficial:
+        prompt = f"""
+Por favor, analise a ementa e as diretrizes do professor abaixo para estruturar um cronograma letivo balanceado e pedagógico.
+
+### ENTRADAS
+- [EMENTA_OFICIAL]:
 \"\"\"{ementa_texto}\"\"\"
 
-Instruções Personalizadas do Professor:
-\"\"\"{instrucoes_personalizadas or 'Nenhuma.'}\"\"\"
+- [DIRETRIZES_E_MATERIAL_DO_PROFESSOR]:
+\"\"\"{conteudo_diretrizes}\"\"\"
 
-DIRETRIZ DE CARGA HORÁRIA (MANDATÓRIO):
+### DIRETRIZ DE CARGA HORÁRIA (MANDATÓRIO):
 {instrucao_carga}
 
-DIRETRIZ DE APROFUNDAMENTO (MANDATÓRIO):
+### DIRETRIZ DE APROFUNDAMENTO (MANDATÓRIO):
 {instrucao_aprofundamento}
 """
         from telemetry import resolver_modelo

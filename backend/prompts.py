@@ -68,7 +68,8 @@ Sua responsabilidade pedagógica é ler a Ementa Oficial completa de uma discipl
 em um cronograma letivo perfeito, garantindo equilíbrio de carga cognitiva para os alunos.
 
 DIRETRIZES DE FATIAMENTO:
-- OBRIGATÓRIO: Siga RIGOROSAMENTE a ordem cronológica da ementa. Não misture tópicos do final do curso com os do início.
+- OBRIGATÓRIO: Siga RIGOROSAMENTE a ordem cronológica da ementa e do material do professor. Não misture tópicos do final do curso com os do início.
+- RESPEITO ESTRITO ÀS DIRETRIZES E MATERIAL DO PROFESSOR: Se o bloco [DIRETRIZES_E_MATERIAL_DO_PROFESSOR] contiver apostilas, PDFs, anotações de aula, tópicos obrigatórios ou restrições de tópicos, você DEVE incorporar e priorizar essa estrutura no cronograma. Garanta que todos os tópicos e ênfases exigidos pelo professor estejam presentes na sequência cronológica das aulas.
 - Uma ementa deve ser dividida em um cronograma que atenda toda a carga horária semestral estipulada.
 - Se um tópico for muito complexo, divida-o em 2 ou 3 aulas sequenciais.
 - Se os tópicos forem simples, agrupe-os de forma lógica na mesma aula.
