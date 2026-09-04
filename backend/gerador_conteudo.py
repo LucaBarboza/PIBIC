@@ -121,11 +121,14 @@ Cada item da lista deve focar intensamente em um único conceito específico, ga
 ### ENTRADAS DO USUÁRIO
 - [EMENTA]: {ementa_texto}
 - [TÓPICO_SOLICITADO]: {tema_solicitado}
+- [DIRETRIZES_E_MATERIAL_DO_PROFESSOR]: {diretrizes_texto}
 """
     
     contents_roteirista = []
     if ementa_texto:
         contents_roteirista.append(f"Esta é a ementa oficial:\n{ementa_texto}")
+    if diretrizes_texto:
+        contents_roteirista.append(f"Diretrizes e material do professor:\n{diretrizes_texto}")
     contents_roteirista.append(prompt_roteirista)
 
     from gemini_retry import executar_chamada_com_retry
