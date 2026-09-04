@@ -403,7 +403,21 @@ def rodar_agentes_paralelos(conteudo_final, titulo_aula, modelo_llm="hibrido", d
         )
         
     def task_simulador(idx_pag, nome_sim):
-        html = agente_simulador.gerar_simulador_html(titulo_aula, nome_sim, logger=logger, modelo_llm=modelo_llm, tracker=tracker)
+        sub_idx_int = int(idx_pag) - 1 if str(idx_pag).isdigit() else 0
+        sub_info = ""
+        paginas = conteudo_final.get("paginas_conteudo", [])
+        if 0 <= sub_idx_int < len(paginas):
+            pag = paginas[sub_idx_int]
+            sub_info = f"Subtópico: {pag.get('titulo_subtopico', '')}\nTeoria/Conceito: {pag.get('discussao_teorica_prosa', '')[:1000]}\nFórmulas: {pag.get('formalismo_latex', 'N/A')}"
+
+        html = agente_simulador.gerar_simulador_html(
+            tema_aula=titulo_aula, 
+            nome_simulador=nome_sim, 
+            contexto_subtopico=sub_info,
+            logger=logger, 
+            modelo_llm=modelo_llm, 
+            tracker=tracker
+        )
         if html:
             return {"indice_pagina": str(idx_pag), "nome_simulador": nome_sim, "codigo_html_gerado": html}
         return None
