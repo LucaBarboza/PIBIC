@@ -17,21 +17,54 @@ from macro_roteirista import MacroRoteirista
 import json
 from logger_agentes import AgentLogger
 
+def _parse_firebase_credentials(raw_val: str) -> dict:
+    if not raw_val:
+        raise ValueError("Credenciais vazias")
+    s = raw_val.strip()
+    if s.startswith("FIREBASE_CREDENTIALS="):
+        s = s[len("FIREBASE_CREDENTIALS="):].strip()
+    if s.startswith("'") and s.endswith("'"):
+        s = s[1:-1].strip()
+    elif s.startswith('"') and s.endswith('"') and not s.startswith('{"'):
+        s = s[1:-1].strip()
+    
+    # 1. Tenta JSON direto
+    try:
+        data = json.loads(s)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+        
+    # 2. Tenta Base64
+    try:
+        import base64
+        decoded = base64.b64decode(s).decode('utf-8').strip()
+        data = json.loads(decoded)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+        
+    # 3. Tenta corrigir newlines escapados
+    try:
+        fixed_s = s.replace('\\\\n', '\\n')
+        data = json.loads(fixed_s)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+        
+    raise ValueError(f"Formato de credencial inválido (tamanho: {len(s)})")
+
 # Inicialização do Firebase Admin
 try:
     cred = None
     if os.environ.get("FIREBASE_CREDENTIALS"):
-        cred_raw = os.environ.get("FIREBASE_CREDENTIALS").strip()
-        try:
-            cred_dict = json.loads(cred_raw)
-        except Exception:
-            import base64
-            cred_dict = json.loads(base64.b64decode(cred_raw).decode('utf-8'))
+        cred_dict = _parse_firebase_credentials(os.environ.get("FIREBASE_CREDENTIALS"))
         cred = credentials.Certificate(cred_dict)
     elif os.environ.get("FIREBASE_CREDENTIALS_BASE64"):
-        import base64
-        cred_raw = os.environ.get("FIREBASE_CREDENTIALS_BASE64").strip()
-        cred_dict = json.loads(base64.b64decode(cred_raw).decode('utf-8'))
+        cred_dict = _parse_firebase_credentials(os.environ.get("FIREBASE_CREDENTIALS_BASE64"))
         cred = credentials.Certificate(cred_dict)
     else:
         cred_path = os.path.join(os.path.dirname(__file__), "serviceAccountKey.json")
