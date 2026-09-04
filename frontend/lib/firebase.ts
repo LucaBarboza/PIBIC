@@ -3,13 +3,12 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBKt99lfFfW1MeSNwqxtU66x8eqV0nGI88",
-  authDomain: "plataforma-aulas-ufba.firebaseapp.com",
-  projectId: "plataforma-aulas-ufba",
-  storageBucket: "plataforma-aulas-ufba.firebasestorage.app",
-  messagingSenderId: "838145348800",
-  appId: "1:838145348800:web:a76e45f35d62657bc7c925",
-  measurementId: "G-NSBFDC8E38"
+  apiKey: "AIzaSyARGg3sKYfHYhOCdAgDWHi3n8GfeC3RRak",
+  authDomain: "plataforma-aulas.firebaseapp.com",
+  projectId: "plataforma-aulas",
+  storageBucket: "plataforma-aulas.firebasestorage.app",
+  messagingSenderId: "2214721285",
+  appId: "1:2214721285:web:20960c3c7f1ba602c8a96c"
 };
 
 // Initialize Firebase (Singleton pattern para Next.js)
