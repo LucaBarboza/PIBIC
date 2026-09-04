@@ -30,11 +30,11 @@ CAMBIO_BRL = 5.70  # Taxa de conversão USD -> BRL (Dólar Comercial)
 def resolver_modelo(agente: str = "", modo_llm: str = "3.5") -> str:
     """
     Retorna o modelo de IA oficial para cada agente:
-    - Macro-Roteirista (Semestre) e Orquestrador Editorial (Aula): Gemini 3.6 Flash ("Pro" para inteligência estrutural)
-    - Escritores, Revisor, Simulador, Exercícios, Validador KaTeX: Gemini 3.5 Flash-Lite (velocidade e 500 RPD)
+    - Macro-Roteirista, Orquestrador Editorial e Simulador Interativo: Gemini 3.6 Flash ("Pro" para raciocínio visual e inteligência estrutural)
+    - Escritores, Revisor, Exercícios, Validador KaTeX: Gemini 3.5 Flash-Lite (velocidade e 500 RPD)
     """
     agente_norm = (agente or "").lower().replace("-", "_").replace(" ", "_")
-    if any(k in agente_norm for k in ["macro_roteirista", "macroroteirista", "orquestrador"]):
+    if any(k in agente_norm for k in ["macro_roteirista", "macroroteirista", "orquestrador", "simulador", "engenheiro_simulacao"]):
         return "gemini-3.6-flash"
     return "gemini-3.5-flash-lite"
 

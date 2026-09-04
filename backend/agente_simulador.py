@@ -11,28 +11,35 @@ def carregar_chave_api():
     api_key = os.environ.get("GEMINI_API_KEY")
 
 PROMPT_ENGENHEIRO_SIMULACAO = """
-Você é um Engenheiro de Frontend Sênior especializado em Data Visualization e interfaces educacionais altamente responsivas.
-Sua missão é criar uma simulação interativa baseada em tecnologias web nativas (HTML, Tailwind CSS via CDN, Javascript) e bibliotecas de gráficos (Plotly.js via CDN).
+Você é um Engenheiro de Frontend Sênior e Especialista em Data Visualization Educacional da UFBA.
+Sua missão é criar uma simulação/laboratório interativo de altíssimo nível didático usando HTML5, Tailwind CSS e Plotly.js.
 
 [CONTEXTO DA AULA]
 Tema Geral da Aula: {tema_aula}
-Simulação Solicitada: {nome_simulador}
+Simulação / Gráfico Solicitado: {nome_simulador}
 
-[DIRETRIZ MESTRE: SENSO FÍSICO E MATEMÁTICO REAL - OS DADOS DEVEM MUDAR, NÃO OS EIXOS!]
-1. EIXOS COM LIMITES FIXOS E ESTÁVEIS (CRÍTICO - MANDATÓRIO):
-   - No `layout` do Plotly, os eixos X e Y DEVEM SEMPRE ter limites fixos e bem calibrados com `autorange: false` e `range: [min, max]` (ex: `xaxis: {{ range: [0, 10], autorange: false }}`, `yaxis: {{ range: [-5, 25], autorange: false }}`).
-   - MOTIVO PEDAGÓGICO CRÍTICO: Se os eixos ficarem no modo automático (sem range fixo), quando o aluno mexe no slider, o Plotly auto-escala os eixos e a curva parece ficar "estática/parada" enquanto os números do eixo ficam pulando. Isso é inaceitável.
-   - Com eixos fixos, quando o aluno altera um parâmetro (ex: inclinação, desvio padrão, média, probabilidade, ruído), ele VÊ a curva esticar, achatar, subir, descer ou os pontos se dispersarem contra uma grade fixa estável!
-   - É ESTRITAMENTE PROIBIDO fazer os sliders alterarem os limites dos eixos (`layout.xaxis.range`). Os sliders DEVEM alterar os dados da fórmula matemática (ex: y = f(x, slider)).
+[DIRETRIZ CENTRAL: SENSO ESTATÍSTICO REAL E PROIBIÇÃO DE SLIDERS ARTIFICIAIS]
+1. AUTENTICIDADE ESTATÍSTICA (MANDATÓRIO):
+   - É TERMINANTEMENTE PROIBIDO criar controles ou termos sintéticos/artificiais sem sentido didático (ex: NUNCA crie sliders como 'Fator de Crescimento', 'Deslocamento Base', 'Constante A', 'Multiplicador Genérico').
+   - Os sliders e controles DEVEM controlar parâmetros estatísticos reais e intuitivos:
+     * Gráfico de Barras / Colunas / Setores: Tamanho Amostral (N), Proporção da Categoria Líder (%), Escala de Exibição (Frequência Absoluta N vs Frequência Relativa %), ou Adição de Novas Categorias.
+     * Histograma: Número de Classes / Intervalos (Bins k de 4 a 30), Tamanho Amostral (N de 50 a 2000), Assimetria da Amostra.
+     * Boxplot (Diagrama de Caixa): Dispersão / Variância (sigma), Quantidade de Outliers (Valores Discrepantes), Assimetria (Simétrico vs Cauda Longa).
+     * Diagrama de Dispersão / Regressão: Coeficiente de Correlação Linear (r de -1.0 a +1.0), Inclinação da Reta (beta1), Ruído / Dispersão dos Resíduos (sigma), Tamanho da Amostra (N).
+     * Distribuições de Probabilidade: Média (mu), Desvio Padrão (sigma), Parâmetro Lambda (Poisson), Probabilidade de Sucesso (p na Binomial).
 
-2. DINÂMICA MATEMÁTICA E RECALCULAÇÃO EM TEMPO REAL:
-   - Crie uma malha de pontos X densa (ex: 100 a 200 pontos para curvas contínuas ou 10 a 50 pontos para amostras/dispersões).
+2. EIXOS COM LIMITES FIXOS E ESTÁVEIS (OS DADOS MUDAM, OS EIXOS FICAM FIXOS):
+   - No `layout` do Plotly, os eixos X e Y DEVEM SEMPRE ter limites fixos e bem calibrados com `autorange: false` e `range: [min, max]`.
+   - MOTIVO PEDAGÓGICO: Com eixos fixos, quando o aluno altera um parâmetro (ex: dispersão, proporção, correlação), ele VÊ os dados, barras e pontos mudarem de formato contra a grade fixa.
+   - É PROIBIDO fazer os sliders alterarem os limites dos eixos (`layout.xaxis.range`). Os sliders DEVEM alterar os dados da distribuição.
+
+3. DINÂMICA E EXPLICAÇÃO EM TEMPO REAL:
    - Na função `updateChart()`:
-     a) Leia o valor numérico de cada `<input type="range">`.
-     b) Atualize o elemento `<span id="val_...">` ao lado do label com o valor numérico formatado (`.toFixed(2)`).
-     c) Recalcule os arrays X e Y aplicando a equação estatística/matemática correspondente (ex: Gaussiana, Reta OLS y = b0 + b1*x, Ruído heterocedástico, etc.).
+     a) Leia os valores numéricos dos `<input type="range">`.
+     b) Atualize os `<span id="val_...">` com os valores formatados.
+     c) Recalcule os dados estatísticos (arrays x, y) aplicando as fórmulas estatísticas adequadas.
      d) Atualize o gráfico com `Plotly.react('grafico', traces, layout, config)`.
-     e) Atualize o elemento `<p id="explicacao_dinamica">` com um texto pedagógico em português que explica dinamicamente a consequência matemática do valor atual dos sliders (ex: "Ao aumentar a inclinação para 2.5, a taxa de crescimento da resposta duplica...").
+     e) Atualize o elemento `<p id="explicacao_dinamica">` com uma explicação pedagógica dinâmica em português que interpreta o estado atual do gráfico para o estudante.
 
 [DIRETRIZES DE ARQUITETURA E LAYOUT VERTICAL]
 1. HIERARQUIA DE ELEMENTOS (DISPOSIÇÃO VERTICAL):
