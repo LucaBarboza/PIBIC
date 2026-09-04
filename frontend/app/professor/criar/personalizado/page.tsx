@@ -61,11 +61,7 @@ export default function CriarSalaPersonalizada() {
   const fileInputRefsNotacoes = useRef<any>({});
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push("/login");
-        return;
-      }
+    async function loadDisciplinas() {
       try {
         const discSnapshot = await getDocs(collection(db, "disciplinas"));
         const discList = discSnapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
@@ -76,9 +72,9 @@ export default function CriarSalaPersonalizada() {
       } finally {
         setLoading(false);
       }
-    });
-    return () => unsubscribeAuth();
-  }, [router]);
+    }
+    loadDisciplinas();
+  }, []);
 
   const handleGlobalFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;

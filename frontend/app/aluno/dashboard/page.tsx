@@ -10,8 +10,8 @@ export default function AlunoDashboard() {
   const router = useRouter();
   
   // Perfil
-  const [alunoName, setAlunoName] = useState("");
-  const [alunoCurso, setAlunoCurso] = useState("");
+  const [alunoName, setAlunoName] = useState("Aluno(a)");
+  const [alunoCurso, setAlunoCurso] = useState("Graduação - UFBA");
 
   // Views
   const [view, setView] = useState<"turmas" | "entrar" | "fluxograma">("turmas");
@@ -26,49 +26,34 @@ export default function AlunoDashboard() {
   const [errorJoin, setErrorJoin] = useState("");
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push("/login");
-        setLoadingTurmas(false);
-        return;
-      }
-
+    async function loadData() {
       try {
-        // 1. Busca perfil do aluno
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          setAlunoName(userDoc.data().nome);
-          setAlunoCurso(userDoc.data().curso);
-        }
-
-        // 2. Busca matriculas do aluno
-        const qEnrollments = query(collection(db, "enrollments"), where("studentId", "==", user.uid));
-        const enrollSnapshot = await getDocs(qEnrollments);
-        
-        const turmas: any[] = [];
-        for (const enrollDoc of enrollSnapshot.docs) {
-          const classId = enrollDoc.data().classroomId;
-          // Buscar detalhes da turma
-          const classDoc = await getDoc(doc(db, "classrooms", classId));
-          if (classDoc.exists()) {
-            turmas.push({ id: classDoc.id, ...classDoc.data() });
+        if (auth.currentUser) {
+          const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+          if (userDoc.exists()) {
+            setAlunoName(userDoc.data().nome || "Aluno(a)");
+            setAlunoCurso(userDoc.data().curso || "Graduação - UFBA");
           }
         }
-        setMinhasTurmas(turmas);
 
+        // Buscar salas diretamente para livre acesso
+        const snapshot = await getDocs(collection(db, "classrooms"));
+        const turmas = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setMinhasTurmas(turmas);
       } catch (err) {
-        console.error("Erro ao buscar dados do aluno:", err);
+        console.error("Erro ao carregar dados do aluno:", err);
       } finally {
         setLoadingTurmas(false);
       }
-    });
-
-    return () => unsubscribeAuth();
-  }, [view, router]);
+    }
+    loadData();
+  }, [view]);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    router.push("/login");
+    try {
+      await signOut(auth);
+    } catch(e) {}
+    router.push("/");
   };
 
   const joinClass = async (e: React.FormEvent) => {
@@ -95,12 +80,7 @@ export default function AlunoDashboard() {
       const classId = snapshot.docs[0].id;
 
       // 2. Verifica se já está matriculado
-      const studentId = auth.currentUser?.uid;
-      if (!studentId) {
-        setErrorJoin("Erro de autenticação: usuário não identificado.");
-        setLoadingJoin(false);
-        return;
-      }
+      const studentId = auth.currentUser?.uid || "aluno_guest";
 
       const qCheck = query(
         collection(db, "enrollments"), 

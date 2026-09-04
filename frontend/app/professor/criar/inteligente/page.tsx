@@ -23,11 +23,7 @@ export default function CriarSalaInteligente() {
   const [showGlobalAdvanced, setShowGlobalAdvanced] = useState(false);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push("/login");
-        return;
-      }
+    async function loadDisciplinas() {
       try {
         const discSnapshot = await getDocs(collection(db, "disciplinas"));
         const discList = discSnapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
@@ -38,9 +34,9 @@ export default function CriarSalaInteligente() {
       } finally {
         setLoading(false);
       }
-    });
-    return () => unsubscribeAuth();
-  }, [router]);
+    }
+    loadDisciplinas();
+  }, []);
 
   const handleSubmit = async () => {
     if (!selectedDisciplina) return alert("Selecione uma disciplina.");

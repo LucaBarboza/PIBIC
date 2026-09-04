@@ -10,8 +10,8 @@ export default function ProfessorDashboard() {
   const router = useRouter();
   
   // User Profile
-  const [professorName, setProfessorName] = useState("");
-  const [professorDept, setProfessorDept] = useState("");
+  const [professorName, setProfessorName] = useState("Professor de Estatística");
+  const [professorDept, setProfessorDept] = useState("Departamento de Estatística - UFBA");
 
   // States
   const [loading, setLoading] = useState(true);
@@ -26,61 +26,62 @@ export default function ProfessorDashboard() {
   useEffect(() => {
     let unsubscribeSalas: (() => void) | undefined;
 
-    // DESVINCULAÇÃO DE LOGIN PARA TESTES
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push("/login");
-        setLoading(false);
-        return;
-      }
-    
-      try {
-        // 1. Buscar Perfil do Professor
-        const userDoc = await getDoc(doc(db, "users", user.uid));
+    // Se houver usuário autenticado, carregar nome se disponível
+    if (auth.currentUser) {
+      getDoc(doc(db, "users", auth.currentUser.uid)).then(userDoc => {
         if (userDoc.exists()) {
-          setProfessorName(userDoc.data().nome);
-          setProfessorDept(userDoc.data().departamento);
+          setProfessorName(userDoc.data().nome || "Professor de Estatística");
+          setProfessorDept(userDoc.data().departamento || "Departamento de Estatística - UFBA");
         }
+      }).catch(console.error);
+    }
 
-        // 2. Buscar Salas em TEMPO REAL (onSnapshot)
-        const qSalas = query(
-          collection(db, "classrooms"), 
-          where("teacherId", "==", user.uid),
-          orderBy("createdAt", "desc")
-        );
-        
-        unsubscribeSalas = onSnapshot(qSalas, (snapshot) => {
-          const salasList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-          setMinhasSalas(salasList);
-        }, (error) => {
-          console.warn("Aviso: Índice de salas ainda construindo. As turmas aparecerão em breve.");
-        });
-
-        // 3. Buscar Disciplinas disponíveis no Banco
-        try {
-          const discSnapshot = await getDocs(collection(db, "disciplinas"));
-          const discList = discSnapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-          setDisciplinas(discList);
-        } catch (error) {
-          console.error("Erro ao carregar disciplinas:", error);
-        }
-
-      } catch (error) {
-        console.error("Erro ao carregar dados do dashboard:", error);
-      } finally {
+    // Buscar Salas em TEMPO REAL (onSnapshot)
+    try {
+      const qSalas = query(
+        collection(db, "classrooms"), 
+        orderBy("createdAt", "desc")
+      );
+      
+      unsubscribeSalas = onSnapshot(qSalas, (snapshot) => {
+        const salasList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setMinhasSalas(salasList);
         setLoading(false);
-      }
+      }, (error) => {
+        console.warn("Aviso: Tentando fallback sem orderBy para salas:", error);
+        unsubscribeSalas = onSnapshot(collection(db, "classrooms"), (s) => {
+          const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
+          list.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+          setMinhasSalas(list);
+          setLoading(false);
+        }, (err2) => {
+          console.error("Erro ao carregar salas:", err2);
+          setLoading(false);
+        });
+      });
+    } catch (error) {
+      console.error("Erro ao inicializar listener de salas:", error);
+      setLoading(false);
+    }
+
+    // Buscar Disciplinas disponíveis no Banco
+    getDocs(collection(db, "disciplinas")).then(discSnapshot => {
+      const discList = discSnapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+      setDisciplinas(discList);
+    }).catch(error => {
+      console.error("Erro ao carregar disciplinas:", error);
     });
 
     return () => {
-      unsubscribeAuth();
       if (unsubscribeSalas) unsubscribeSalas();
     };
   }, []);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    router.push("/login");
+    try {
+      await signOut(auth);
+    } catch(e) {}
+    router.push("/");
   };
 
   const deleteClassroom = async (salaId: string) => {
