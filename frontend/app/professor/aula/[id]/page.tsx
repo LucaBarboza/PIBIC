@@ -81,48 +81,6 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
     );
   }
 
-  const injectedHtml = html ? (() => {
-    const fallbackAndResizeScript = `<script>
-      (function() {
-        let lastHeight = 0;
-        function notifyParent() {
-          const contentDiv = document.querySelector('.max-w-4xl') || document.querySelector('.max-w-5xl') || document.body;
-          const h = Math.max(contentDiv ? contentDiv.scrollHeight + 60 : document.body.scrollHeight + 40, 750);
-          if (Math.abs(h - lastHeight) > 10) {
-            lastHeight = h;
-            window.parent.postMessage({ type: 'resize', height: h }, '*');
-          }
-        }
-        window.addEventListener('load', notifyParent);
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-          notifyParent();
-        }
-        setTimeout(notifyParent, 300);
-        setTimeout(notifyParent, 800);
-        setTimeout(notifyParent, 2000);
-        setInterval(notifyParent, 2500);
-
-        // Fallback: garante que se os sliders dispararem ou se o Plotly demorou a carregar, o gráfico renderize
-        function ensurePlotRendered() {
-          if (typeof Plotly !== 'undefined') {
-            const sliders = document.querySelectorAll('input[type="range"]');
-            if (sliders.length > 0) {
-              sliders[0].dispatchEvent(new Event('input', { bubbles: true }));
-            }
-          } else {
-            setTimeout(ensurePlotRendered, 150);
-          }
-        }
-        setTimeout(ensurePlotRendered, 300);
-        setTimeout(ensurePlotRendered, 1000);
-      })();
-    </script>`;
-    if (html.includes('</body>')) {
-      return html.replace('</body>', `${fallbackAndResizeScript}</body>`);
-    }
-    return html + fallbackAndResizeScript;
-  })() : null;
-
   return (
     <div className="my-8 border border-slate-200 rounded-xl overflow-hidden shadow-lg bg-white">
       <div className="bg-slate-800 text-slate-100 px-4 py-3 flex justify-between items-center">
@@ -134,8 +92,8 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
         </div>
       </div>
       <iframe 
-        srcDoc={injectedHtml!}
-        style={{ height: `${iframeHeight}px` }}
+        srcDoc={html!}
+        style={{ height: `${iframeHeight}px`, minHeight: "750px" }}
         className="w-full border-none bg-white"
         sandbox="allow-scripts allow-same-origin"
         scrolling="no"
