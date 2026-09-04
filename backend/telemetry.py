@@ -30,10 +30,10 @@ CAMBIO_BRL = 5.50  # Taxa de conversão USD -> BRL
 def resolver_modelo(agente: str = "", modo_llm: str = "3.6") -> str:
     """
     Retorna o modelo de IA oficial:
-    - Escrita Teórica & Simulador: gemini-3.6-flash (profundidade, densidade e rigor)
+    - Escrita Teórica & Simulador & Expansor: gemini-3.6-flash (profundidade, densidade e rigor)
     - Agentes de apoio (Roteiro, Exercícios, Validador, LaTeX): gemini-3.5-flash-lite
     """
-    if agente in ["escritor", "simulador"]:
+    if agente in ["escritor", "simulador", "expansor"]:
         return "gemini-3.6-flash"
     return "gemini-3.5-flash-lite"
 

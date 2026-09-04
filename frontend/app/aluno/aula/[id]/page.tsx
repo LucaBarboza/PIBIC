@@ -412,9 +412,9 @@ export default function SemesterViewer() {
                         {latexCode && latexCode !== "null" && (
                           <div className="my-6 sm:my-8 p-4 sm:p-6 bg-slate-50 rounded-xl border border-slate-200 text-center">
                             <span className="text-blue-800 font-bold block mb-2 text-xs sm:text-sm uppercase tracking-wider">Fórmula / Definição Formal</span>
-                            <div className="text-base sm:text-lg text-left inline-block w-full break-words">
+                            <div className="text-base sm:text-lg text-left inline-block w-full break-words overflow-x-auto max-w-full pb-2">
                               <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, {strict: false}]]}>
-                                {processLatex(latexCode)}
+                                {processLatex(latexCode.startsWith('$$') || latexCode.startsWith('$') ? latexCode : `$$\n${latexCode}\n$$`)}
                               </ReactMarkdown>
                             </div>
                           </div>
@@ -427,7 +427,7 @@ export default function SemesterViewer() {
                             </h5>
                             <div className="bg-white p-3 sm:p-4 rounded-lg border border-slate-200 shadow-sm space-y-3">
                               {deducoes.map((passo: string, pIdx: number) => (
-                                <div key={pIdx} className="text-slate-600 text-xs sm:text-sm leading-relaxed">
+                                <div key={pIdx} className="text-slate-600 text-xs sm:text-sm leading-relaxed overflow-x-auto max-w-full pb-1">
                                   <ReactMarkdown remarkPlugins={[remarkMath, remarkBreaks]} rehypePlugins={[[rehypeKatex, {strict: false}]]}>
                                     {processLatex(passo)}
                                   </ReactMarkdown>
