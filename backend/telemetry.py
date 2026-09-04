@@ -8,6 +8,11 @@ PRECOS_MODELOS = {
         "completion": 2.50 / 1_000_000,
         "nome_display": "Gemini 3.5 Flash-Lite"
     },
+    "gemini-3.6-flash": {
+        "prompt": 1.50 / 1_000_000,
+        "completion": 7.50 / 1_000_000,
+        "nome_display": "Gemini 3.6 Flash"
+    },
     "gemini-2.5-flash": {
         "prompt": 0.30 / 1_000_000,
         "completion": 2.50 / 1_000_000,
@@ -22,11 +27,14 @@ PRECOS_MODELOS = {
 
 CAMBIO_BRL = 5.50  # Taxa de conversão USD -> BRL
 
-def resolver_modelo(agente: str = "", modo_llm: str = "3.5") -> str:
+def resolver_modelo(agente: str = "", modo_llm: str = "3.6") -> str:
     """
-    Retorna o modelo de IA oficial.
-    Padronizado em gemini-3.5-flash-lite para 100% dos agentes do sistema.
+    Retorna o modelo de IA oficial:
+    - Escrita Teórica & Simulador: gemini-3.6-flash (profundidade, densidade e rigor)
+    - Agentes de apoio (Roteiro, Exercícios, Validador, LaTeX): gemini-3.5-flash-lite
     """
+    if agente in ["escritor", "simulador"]:
+        return "gemini-3.6-flash"
     return "gemini-3.5-flash-lite"
 
 class TokenTracker:
@@ -88,7 +96,7 @@ class TokenTracker:
 
     def obter_resumo(self) -> Dict[str, Any]:
         tempo_total = round(time.time() - self.t_inicio, 1)
-        modo_label = "Ultra Econômico (3.5 Flash-Lite)" if str(self.modo_llm) in ["3.5", "flash_lite"] else "Híbrido Otimizado (2.5 Flash + Pro)"
+        modo_label = "Gemini 3.6 Flash (Escrita) + 3.5 Flash-Lite (Apoio)"
         
         return {
             "modo_utilizado": str(self.modo_llm),

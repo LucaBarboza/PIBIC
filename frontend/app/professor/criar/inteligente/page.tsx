@@ -189,15 +189,15 @@ export default function CriarSalaInteligente() {
                     <div className="p-6 border-t border-slate-200 space-y-6 bg-white">
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">Motor de Inteligência Artificial & Modo de Custo</label>
-                            <div className="flex items-start p-4 rounded-xl border-2 border-emerald-600 bg-emerald-50/70 shadow-sm">
-                                <span className="text-2xl mr-3">⚡</span>
+                            <div className="flex items-start p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/70 shadow-sm">
+                                <span className="text-2xl mr-3">🚀</span>
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className="font-bold text-slate-800 text-sm">Gemini 3.5 Flash-Lite</span>
-                                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Ultra Econômico & Rápido</span>
+                                        <span className="font-bold text-slate-800 text-sm">Gemini 3.6 Flash + 3.5 Flash-Lite</span>
+                                        <span className="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold">Alta Inteligência & Extensão</span>
                                     </div>
-                                    <div className="text-xs text-slate-600 leading-relaxed mb-2">Todos os agentes rodam 100% no Gemini 3.5 Flash-Lite com velocidade máxima e auditoria de tokens.</div>
-                                    <div className="text-xs font-semibold text-emerald-700">~R$ 0,17 / aula completa</div>
+                                    <div className="text-xs text-slate-600 leading-relaxed mb-2">Escrita teórica densa e simuladores com <strong>Gemini 3.6 Flash</strong> + suporte rápido com <strong>Gemini 3.5 Flash-Lite</strong>.</div>
+                                    <div className="text-xs font-semibold text-indigo-700">~R$ 0,35 a R$ 0,50 / aula completa</div>
                                 </div>
                             </div>
                         </div>
