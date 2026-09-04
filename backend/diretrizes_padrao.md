@@ -1,6 +1,6 @@
 # Diretrizes Padrão de Notação e Design Âncora (Plataforma 2.0)
 
-Este documento atua como a âncora oficial de padronização estética, terminológica e notacional para a geração de conteúdos teóricos e componentes interativos na plataforma de aulas. A inteligência artificial (Gemini 3.1 Flash-Lite e outros agentes) deve ler e aplicar estas diretrizes de forma estrita em todas as etapas da geração da plataforma.
+Este documento atua como a âncora oficial de padronização estética, terminológica e notacional para a geração de conteúdos teóricos e componentes interativos na plataforma de aulas. A inteligência artificial (Gemini 3.5 Flash-Lite e outros agentes) deve ler e aplicar estas diretrizes de forma estrita em todas as etapas da geração da plataforma.
 
 ---
 
