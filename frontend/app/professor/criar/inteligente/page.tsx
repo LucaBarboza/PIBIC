@@ -19,7 +19,7 @@ export default function CriarSalaInteligente() {
   const [modoDefinicao, setModoDefinicao] = useState<"padrao" | "auto" | "manual">("padrao");
   const [qtdManual, setQtdManual] = useState<number>(30);
   const [aulasComplementares, setAulasComplementares] = useState(false);
-  const [modeloLlm, setModeloLlm] = useState<"2.5" | "3.5">("2.5");
+  const [modeloLlm, setModeloLlm] = useState<"2.5" | "3.5">("3.5");
   const [showGlobalAdvanced, setShowGlobalAdvanced] = useState(false);
 
   useEffect(() => {

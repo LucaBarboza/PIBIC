@@ -22,24 +22,12 @@ PRECOS_MODELOS = {
 
 CAMBIO_BRL = 5.50  # Taxa de conversão USD -> BRL
 
-def resolver_modelo(agente: str, modo_llm: str) -> str:
+def resolver_modelo(agente: str = "", modo_llm: str = "3.5") -> str:
     """
-    Retorna o modelo de IA exato para um determinado agente baseado no modo selecionado.
-    Modo 1: 'flash_lite' / '3.5' -> 100% gemini-3.5-flash-lite
-    Modo 2: 'hibrido' / '2.5' / 'pro' -> gemini-2.5-pro (escrita/simulador) e gemini-2.5-flash (demais)
+    Retorna o modelo de IA oficial.
+    Padronizado em gemini-3.5-flash-lite para 100% dos agentes do sistema.
     """
-    modo_norm = str(modo_llm).lower().strip()
-    
-    # Modo Ultra Econômico
-    if modo_norm in ["3.5", "flash_lite", "flash-lite", "economico"]:
-        return "gemini-3.5-flash-lite"
-        
-    # Modo Híbrido Otimizado (Padrão)
-    # Pro APENAS onde exige redação extensa e código de engenharia
-    if agente in ["escritor", "simulador"]:
-        return "gemini-2.5-pro"
-    else:
-        return "gemini-2.5-flash"
+    return "gemini-3.5-flash-lite"
 
 class TokenTracker:
     def __init__(self, modo_llm: str = "hibrido"):

@@ -20,7 +20,7 @@ export default function CriarSalaPersonalizada() {
   
   // Logic Tree State
   const [modoCriacao, setModoCriacao] = useState<"magico" | "artesao">("magico");
-  const [modeloLlm, setModeloLlm] = useState<"2.5" | "3.5">("2.5");
+  const [modeloLlm, setModeloLlm] = useState<"2.5" | "3.5">("3.5");
 
   // Expander States
   const [expandedBlocks, setExpandedBlocks] = useState<Record<number, boolean>>({});
