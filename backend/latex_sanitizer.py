@@ -72,6 +72,12 @@ def sanitize_latex_string(text: str) -> str:
     processed = processed.replace(r'\[', '\n$$\n').replace(r'\]', '\n$$\n')
     processed = processed.replace(r'\(', '$').replace(r'\)', '$')
 
+    # 2.5 Desaninha equações onde o modelo abriu $ antes da fórmula e depois colocou $$ para a matriz
+    # Exemplo: 'obtida por $\mathbf{X}^T\mathbf{X} = $$ \begin{pmatrix}... $$ $' -> '$$ \mathbf{X}^T\mathbf{X} = \begin{pmatrix}... $$'
+    processed = re.sub(r'(?<!\\)\$\s*([^$\n]*?)\s*\n*\$\$([\s\S]*?)\$\$\s*(?<!\\)\$', r'\n$$\n\1 \2\n$$\n', processed)
+    processed = re.sub(r'(?<!\\)\$\s*\$\$', '\n$$\n', processed)
+    processed = re.sub(r'\$\$\s*(?<!\\)\$', '\n$$\n', processed)
+
     # 3. Se a string contiver \begin{aligned} ou \begin{...} sem $$, envolve em $$
     if '$$' not in processed and r'\begin{' in processed:
         processed = re.sub(r'(\\begin\{[a-zA-Z*]+\}[\s\S]*?\\end\{[a-zA-Z*]+\})', r'\n$$\n\1\n$$\n', processed)

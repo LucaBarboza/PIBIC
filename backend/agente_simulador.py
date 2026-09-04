@@ -18,32 +18,31 @@ Sua missão é criar uma simulação interativa baseada em tecnologias web nativ
 Tema Geral da Aula: {tema_aula}
 Simulação Solicitada: {nome_simulador}
 
-[DIRETRIZ DE SIMPLICIDADE E INTUIÇÃO VISUAL]
-O objetivo central do simulador é proporcionar uma experiência visual interativa, intuitiva e dinâmica com Plotly.js. Os sliders alteram os parâmetros e o gráfico do Plotly atualiza em tempo real. Não sobrecarregue a tela com deduções analíticas no texto — o foco é 100% no gráfico interativo e na resposta visual aos sliders.
+[DIRETRIZ MESTRE: SENSO FÍSICO E MATEMÁTICO REAL - OS DADOS DEVEM MUDAR, NÃO OS EIXOS!]
+1. EIXOS COM LIMITES FIXOS E ESTÁVEIS (CRÍTICO - MANDATÓRIO):
+   - No `layout` do Plotly, os eixos X e Y DEVEM SEMPRE ter limites fixos e bem calibrados com `autorange: false` e `range: [min, max]` (ex: `xaxis: {{ range: [0, 10], autorange: false }}`, `yaxis: {{ range: [-5, 25], autorange: false }}`).
+   - MOTIVO PEDAGÓGICO CRÍTICO: Se os eixos ficarem no modo automático (sem range fixo), quando o aluno mexe no slider, o Plotly auto-escala os eixos e a curva parece ficar "estática/parada" enquanto os números do eixo ficam pulando. Isso é inaceitável.
+   - Com eixos fixos, quando o aluno altera um parâmetro (ex: inclinação, desvio padrão, média, probabilidade, ruído), ele VÊ a curva esticar, achatar, subir, descer ou os pontos se dispersarem contra uma grade fixa estável!
+   - É ESTRITAMENTE PROIBIDO fazer os sliders alterarem os limites dos eixos (`layout.xaxis.range`). Os sliders DEVEM alterar os dados da fórmula matemática (ex: y = f(x, slider)).
 
-[DIRETRIZES DE ARQUITETURA E LAYOUT VERTICAL - CRÍTICO]
+2. DINÂMICA MATEMÁTICA E RECALCULAÇÃO EM TEMPO REAL:
+   - Crie uma malha de pontos X densa (ex: 100 a 200 pontos para curvas contínuas ou 10 a 50 pontos para amostras/dispersões).
+   - Na função `updateChart()`:
+     a) Leia o valor numérico de cada `<input type="range">`.
+     b) Atualize o elemento `<span id="val_...">` ao lado do label com o valor numérico formatado (`.toFixed(2)`).
+     c) Recalcule os arrays X e Y aplicando a equação estatística/matemática correspondente (ex: Gaussiana, Reta OLS y = b0 + b1*x, Ruído heterocedástico, etc.).
+     d) Atualize o gráfico com `Plotly.react('grafico', traces, layout, config)`.
+     e) Atualize o elemento `<p id="explicacao_dinamica">` com um texto pedagógico em português que explica dinamicamente a consequência matemática do valor atual dos sliders (ex: "Ao aumentar a inclinação para 2.5, a taxa de crescimento da resposta duplica...").
+
+[DIRETRIZES DE ARQUITETURA E LAYOUT VERTICAL]
 1. HIERARQUIA DE ELEMENTOS (DISPOSIÇÃO VERTICAL):
    - A página DEVE ser estruturada de cima para baixo na seguinte ordem:
      a) CABEÇALHO: Título e subtítulo em HTML no topo (`<h2 class="text-xl font-bold text-slate-800">{nome_simulador}</h2>`).
-     b) PAINEL DE CONTROLES: Sliders (`<input type="range">`) agrupados em um card com Tailwind CSS no topo/centro.
-     c) CONTAINER DO GRÁFICO (LARGURA TOTAL 100%): O gráfico DEVE ter SEMPRE uma div explícita `<div id="grafico" class="w-full my-4" style="width: 100%; min-height: 420px; height: 450px;"></div>` ABAIXO dos controles. TODA simulação DEVE renderizar um gráfico Plotly na div `grafico`.
-     d) RODAPÉ / CARD EXPLICATIVO (OPCIONAL): Breve explicação das conclusões da simulação.
+     b) PAINEL DE CONTROLES: Sliders (`<input type="range">`) agrupados em um card com Tailwind CSS no topo/centro, com labels claros e spans com os valores numéricos.
+     c) CONTAINER DO GRÁFICO (LARGURA TOTAL 100%): O gráfico DEVE ter SEMPRE uma div explícita `<div id="grafico" class="w-full my-4" style="width: 100%; min-height: 420px; height: 460px;"></div>` ABAIXO dos controles.
+     d) CARD EXPLICATIVO DINÂMICO NO RODAPÉ: `<div class="bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-slate-700 text-sm mb-4"><h4 class="font-bold text-blue-900 mb-1 flex items-center gap-1">💡 Como interpretar este gráfico?</h4><p id="explicacao_dinamica" class="leading-relaxed"></p></div>`.
 
-2. ALTURA, EIXOS E LEGENDA DO GRÁFICO (MANDATÓRIO):
-   - A div do gráfico DEVE ter estilo inline com largura e altura explícitas:
-     `<div id="grafico" class="w-full my-4" style="width: 100%; min-height: 420px; height: 460px;"></div>`
-   - NO JS DO PLOTLY (LAYOUT COMPLETO COM TÍTULO, EIXOS E LEGENDA TOTALMENTE DESCOLADOS):
-     * O container alvo do Plotly DEVE ser exatamente o id `grafico` (`Plotly.newPlot('grafico', ...)`).
-     * Defina o título formal do gráfico dentro do Plotly:
-       `title: {{ text: '{nome_simulador}', font: {{ size: 16, color: '#1e293b' }} }}`
-     * Configure títulos descritivos para os eixos:
-       `xaxis: {{ title: {{ text: 'Nome da Variável X', standoff: 15 }} }}, yaxis: {{ title: {{ text: 'Nome da Variável Y', standoff: 15 }} }}`
-     * LEGENDA E MARGENS (CRÍTICO - EVITE SOBREPOSIÇÃO):
-       Coloque margem inferior suficiente (`b: 80`) e posicione a legenda no topo superior direito ou abaixo do gráfico sem encavalar no título do eixo X:
-       `margin: {{ t: 60, b: 80, l: 65, r: 35 }}, autosize: true, legend: {{ orientation: 'h', x: 0.5, xanchor: 'center', y: 1.15 }}` (legenda no topo acima do gráfico) ou `{{ orientation: 'h', x: 0.5, xanchor: 'center', y: -0.3 }}` (legenda bem abaixo do título do eixo X).
-     * Ative responsividade: `Plotly.newPlot('grafico', data, layout, {{ responsive: true, displayModeBar: false }});`
-
-3. INICIALIZAÇÃO BLINDADA COM POLLING DO PLOTLY (CRÍTICO - EVITA TELA BRANCA):
+2. INICIALIZAÇÃO BLINDADA COM POLLING DO PLOTLY:
    - Como o Plotly é carregado via CDN assíncrono, você DEVE OBRIGATORIAMENTE usar a função de polling antes de chamar `Plotly.newPlot`:
      ```javascript
      function initSimulation() {{
@@ -52,27 +51,25 @@ O objetivo central do simulador é proporcionar uma experiência visual interati
          return;
        }}
        
-       // Configura listeners nos sliders
        const sliders = document.querySelectorAll('input[type="range"]');
        sliders.forEach(s => s.addEventListener('input', updateChart));
        
-       // Executa a primeira renderização do gráfico
        updateChart();
      }}
 
      function updateChart() {{
-       // 1. Lê valores dos sliders
-       // 2. Calcula dados / arrays
-       // 3. Renderiza no Plotly
+       // 1. Lê valores dos sliders e atualiza spans
+       // 2. Calcula arrays X e Y a partir da fórmula matemática
+       // 3. Renderiza no Plotly com eixos fixos
        Plotly.react('grafico', traces, layout, config);
        
-       // Notifica o iframe pai para ajuste de altura
+       // 4. Atualiza explicação dinâmica em português
+       // 5. Notifica o iframe pai para ajuste de altura
        if (window.parent) {{
          window.parent.postMessage({{ type: 'resize', height: document.body.scrollHeight + 60 }}, '*');
        }}
      }}
 
-     // Dispara a inicialização em qualquer estado do DOM
      window.addEventListener('load', initSimulation);
      document.addEventListener('DOMContentLoaded', initSimulation);
      initSimulation();
@@ -97,8 +94,8 @@ Retorne APENAS um documento HTML completo e válido (começando com <!DOCTYPE ht
     </div>
     
     <!-- Painel de Controles no topo -->
-    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-      <!-- Sliders aqui -->
+    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Sliders aqui com seus respectivos labels e spans -->
     </div>
 
     <!-- Div do Gráfico ocupando 100% da largura -->
@@ -120,7 +117,8 @@ Retorne APENAS um documento HTML completo e válido (começando com <!DOCTYPE ht
         setTimeout(initSimulation, 50);
         return;
       }}
-      // Configuração de eventos e primeiro render
+      const sliders = document.querySelectorAll('input[type="range"]');
+      sliders.forEach(s => s.addEventListener('input', updateChart));
       updateChart();
     }}
     window.addEventListener('load', initSimulation);
