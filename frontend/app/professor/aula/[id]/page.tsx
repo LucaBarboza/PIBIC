@@ -410,10 +410,18 @@ export default function ProfessorSemesterViewer() {
                         : 'bg-slate-50 border-dashed border-slate-200 opacity-60 cursor-not-allowed'
                     }`}
                   >
-                    <div className="flex justify-between items-start mb-1">
+                    <div className="flex justify-between items-start mb-1 gap-1">
                       <span className={`font-bold ${aulaCompleta ? 'text-blue-700' : 'text-slate-500'}`}>Aula {numero}</span>
                       {aulaCompleta && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          {aulaCompleta.conteudo_json?.telemetria_custo && (
+                            <span 
+                              className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-bold"
+                              title={`Custo IA: ${aulaCompleta.conteudo_json.telemetria_custo.custo_formatado_usd || ''} (${aulaCompleta.conteudo_json.telemetria_custo.tokens_total?.toLocaleString('pt-BR') || 0} tokens)`}
+                            >
+                              💰 {aulaCompleta.conteudo_json.telemetria_custo.custo_formatado_brl || `R$ ${aulaCompleta.conteudo_json.telemetria_custo.custo_total_brl?.toFixed(2)}`}
+                            </span>
+                          )}
                           <span className="text-[10px] bg-green-100 text-green-700 px-1 rounded uppercase font-bold">Pronta</span>
                           {!aulaCompleta.publicada && <span className="text-[10px] bg-slate-200 text-slate-600 px-1 rounded uppercase font-bold" title="Oculta para alunos">🙈 Oculta</span>}
                         </div>
@@ -479,11 +487,11 @@ export default function ProfessorSemesterViewer() {
                     <span className="text-xl mr-2">🚀</span>
                     <div>
                       <div className="flex items-center gap-1 mb-0.5">
-                        <span className="font-bold text-slate-800 text-xs">Gemini 3.6 Flash + 3.5 Flash-Lite</span>
-                        <span className="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold">Padrão</span>
+                        <span className="font-bold text-slate-800 text-xs">Gemini 3.5 Flash-Lite</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Padrão</span>
                       </div>
-                      <div className="text-[10px] text-slate-500 leading-tight mb-1">Escrita com <strong>Gemini 3.6 Flash</strong> e suporte com <strong>3.5 Flash-Lite</strong>.</div>
-                      <div className="text-[11px] font-bold text-indigo-700">~R$ 0,35 / aula</div>
+                      <div className="text-[10px] text-slate-500 leading-tight mb-1">Geração rápida e econômica com <strong>3.5 Flash-Lite</strong>.</div>
+                      <div className="text-[11px] font-bold text-emerald-700">~R$ 0,15 / aula</div>
                     </div>
                   </div>
                 </div>
@@ -887,103 +895,6 @@ export default function ProfessorSemesterViewer() {
                   </section>
                 )}
               </div> {/* Fim Aba Referências */}
-
-              {/* CARD DE TELEMETRIA & CONTADOR DE GASTOS */}
-              {selectedAula.conteudo_json?.telemetria_custo && (
-                <section className="mt-12 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-700/80">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-slate-700">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xl">📊</span>
-                        <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                          Telemetria & Contador de Gastos da Aula
-                        </h3>
-                      </div>
-                      <p className="text-xs sm:text-sm text-slate-400">
-                        Consumo real de tokens auditado via API do Google Gemini AI
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs bg-indigo-500/20 text-indigo-300 px-3 py-1.5 rounded-full border border-indigo-500/30 font-semibold">
-                        {selectedAula.conteudo_json.telemetria_custo.modo_label || "Modo IA"}
-                      </span>
-                      <div className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-4 py-1.5 rounded-xl text-center">
-                        <div className="text-[10px] uppercase font-bold text-emerald-400">Custo Total</div>
-                        <div className="text-lg font-black text-emerald-300">
-                          {selectedAula.conteudo_json.telemetria_custo.custo_formatado_brl || `R$ ${selectedAula.conteudo_json.telemetria_custo.custo_total_brl?.toFixed(3)}`}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Grid de Métricas Chave */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-6">
-                    <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60">
-                      <span className="text-slate-400 text-xs block mb-1">Total de Tokens</span>
-                      <span className="text-xl sm:text-2xl font-black text-white">
-                        {selectedAula.conteudo_json.telemetria_custo.tokens_total?.toLocaleString("pt-BR") || 0}
-                      </span>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">tokens processados</span>
-                    </div>
-                    <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60">
-                      <span className="text-slate-400 text-xs block mb-1">Tokens de Entrada</span>
-                      <span className="text-xl sm:text-2xl font-bold text-blue-400">
-                        {selectedAula.conteudo_json.telemetria_custo.tokens_prompt?.toLocaleString("pt-BR") || 0}
-                      </span>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">prompts & ementa</span>
-                    </div>
-                    <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60">
-                      <span className="text-slate-400 text-xs block mb-1">Tokens de Saída</span>
-                      <span className="text-xl sm:text-2xl font-bold text-purple-400">
-                        {selectedAula.conteudo_json.telemetria_custo.tokens_resposta?.toLocaleString("pt-BR") || 0}
-                      </span>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">conteúdo & código JS</span>
-                    </div>
-                    <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60">
-                      <span className="text-slate-400 text-xs block mb-1">Custo em Dólar</span>
-                      <span className="text-xl sm:text-2xl font-bold text-emerald-400">
-                        {selectedAula.conteudo_json.telemetria_custo.custo_formatado_usd || `$${selectedAula.conteudo_json.telemetria_custo.custo_total_usd?.toFixed(4)}`}
-                      </span>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">USD (câmbio ~R$ 5,50)</span>
-                    </div>
-                  </div>
-
-                  {/* Tabela de Consumo por Agente */}
-                  {selectedAula.conteudo_json.telemetria_custo.detalhe_agentes?.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-slate-700/80">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                        <span>🤖</span> Detalhamento do Consumo por Agente
-                      </h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead>
-                            <tr className="border-b border-slate-700 text-slate-400">
-                              <th className="pb-2 font-semibold">Agente</th>
-                              <th className="pb-2 font-semibold">Modelo</th>
-                              <th className="pb-2 font-semibold text-right">Prompt</th>
-                              <th className="pb-2 font-semibold text-right">Resposta</th>
-                              <th className="pb-2 font-semibold text-right">Tempo</th>
-                              <th className="pb-2 font-semibold text-right">Custo Estimado</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800">
-                            {selectedAula.conteudo_json.telemetria_custo.detalhe_agentes.map((item: any, idx: number) => (
-                              <tr key={idx} className="hover:bg-slate-800/40 transition">
-                                <td className="py-2.5 font-bold text-slate-200">{item.agente}</td>
-                                <td className="py-2.5 text-indigo-300 font-mono text-[11px]">{item.nome_modelo || item.modelo}</td>
-                                <td className="py-2.5 text-right text-slate-300">{item.tokens_prompt?.toLocaleString("pt-BR")}</td>
-                                <td className="py-2.5 text-right text-slate-300">{item.tokens_resposta?.toLocaleString("pt-BR")}</td>
-                                <td className="py-2.5 text-right text-slate-400">{item.tempo_segundos}s</td>
-                                <td className="py-2.5 text-right font-bold text-emerald-400">R$ {item.custo_brl?.toFixed(4)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </section>
-              )}
             </div>
           )}
         </main>

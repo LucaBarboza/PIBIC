@@ -93,7 +93,7 @@ class TokenTracker:
 
     def obter_resumo(self) -> Dict[str, Any]:
         tempo_total = round(time.time() - self.t_inicio, 1)
-        modo_label = "Gemini 3.6 Flash (Escrita) + 3.5 Flash-Lite (Apoio)"
+        modo_label = "Gemini 3.5 Flash-Lite"
         
         return {
             "modo_utilizado": str(self.modo_llm),

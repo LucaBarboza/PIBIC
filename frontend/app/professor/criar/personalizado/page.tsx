@@ -566,11 +566,11 @@ export default function CriarSalaPersonalizada() {
                                 <span className="text-2xl mr-3">🚀</span>
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className="font-bold text-slate-800 text-sm">Gemini 3.6 Flash + 3.5 Flash-Lite</span>
-                                        <span className="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold">Alta Inteligência & Extensão</span>
+                                        <span className="font-bold text-slate-800 text-sm">Gemini 3.5 Flash-Lite</span>
+                                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Ultra-Rápido & Baixo Custo</span>
                                     </div>
-                                    <div className="text-xs text-slate-600 leading-relaxed mb-2">Escrita teórica densa e simuladores com <strong>Gemini 3.6 Flash</strong> + suporte rápido com <strong>Gemini 3.5 Flash-Lite</strong>.</div>
-                                    <div className="text-xs font-semibold text-indigo-700">~R$ 0,35 a R$ 0,50 / aula completa</div>
+                                    <div className="text-xs text-slate-600 leading-relaxed mb-2">Geração completa de alta velocidade e custo reduzido com <strong>Gemini 3.5 Flash-Lite</strong>.</div>
+                                    <div className="text-xs font-semibold text-emerald-700">~R$ 0,15 a R$ 0,25 / aula completa</div>
                                 </div>
                             </div>
                         </div>
