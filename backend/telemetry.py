@@ -4,13 +4,13 @@ from typing import Dict, List, Any, Optional
 # Tabela Oficial Google AI Studio (Preço por 1 Milhão de Tokens em USD)
 PRECOS_MODELOS = {
     "gemini-3.5-flash-lite": {
-        "prompt": 0.30 / 1_000_000,
-        "completion": 2.50 / 1_000_000,
+        "prompt": 0.10 / 1_000_000,      # $0.10 por 1M tokens de entrada
+        "completion": 0.40 / 1_000_000,  # $0.40 por 1M tokens de saída
         "nome_display": "Gemini 3.5 Flash-Lite"
     },
     "gemini-3.6-flash": {
-        "prompt": 1.50 / 1_000_000,
-        "completion": 7.50 / 1_000_000,
+        "prompt": 0.30 / 1_000_000,      # $0.30 por 1M tokens de entrada
+        "completion": 2.50 / 1_000_000,  # $2.50 por 1M tokens de saída
         "nome_display": "Gemini 3.6 Flash"
     },
     "gemini-2.5-flash": {
@@ -25,7 +25,7 @@ PRECOS_MODELOS = {
     }
 }
 
-CAMBIO_BRL = 5.50  # Taxa de conversão USD -> BRL
+CAMBIO_BRL = 5.70  # Taxa de conversão USD -> BRL (Dólar Comercial)
 
 def resolver_modelo(agente: str = "", modo_llm: str = "3.5") -> str:
     """
