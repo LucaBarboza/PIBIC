@@ -517,29 +517,16 @@ export default function ProfessorSemesterViewer() {
                 {/* Motor IA */}
                 <div>
                   <label className="block text-sm font-bold text-slate-800 mb-1">Motor de IA & Modo de Custo</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className={`flex items-start p-3 rounded-xl border-2 cursor-pointer transition-all ${novaAulaModeloLlm === "2.5" ? "border-indigo-600 bg-indigo-50/70 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-                      <input type="radio" name="avulsa_llm" value="2.5" checked={novaAulaModeloLlm === "2.5"} onChange={() => setNovaAulaModeloLlm("2.5")} className="hidden" />
-                      <span className="text-xl mr-2">🧠</span>
-                      <div>
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <span className="font-bold text-slate-800 text-xs">Híbrido Otimizado</span>
-                        </div>
-                        <div className="text-[10px] text-slate-500 leading-tight mb-1">Gemini 2.5 Pro (Escrita/Simulador) + Flash (Apoio).</div>
-                        <div className="text-[11px] font-bold text-indigo-700">~R$ 0,25 a R$ 0,30</div>
+                  <div className="flex items-start p-3 rounded-xl border-2 border-emerald-600 bg-emerald-50/70 shadow-sm">
+                    <span className="text-xl mr-2">⚡</span>
+                    <div>
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <span className="font-bold text-slate-800 text-xs">Gemini 3.5 Flash-Lite</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Padrão</span>
                       </div>
-                    </label>
-                    <label className={`flex items-start p-3 rounded-xl border-2 cursor-pointer transition-all ${novaAulaModeloLlm === "3.5" ? "border-emerald-600 bg-emerald-50/70 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-                      <input type="radio" name="avulsa_llm" value="3.5" checked={novaAulaModeloLlm === "3.5"} onChange={() => setNovaAulaModeloLlm("3.5")} className="hidden" />
-                      <span className="text-xl mr-2">⚡</span>
-                      <div>
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <span className="font-bold text-slate-800 text-xs">Ultra Econômico</span>
-                        </div>
-                        <div className="text-[10px] text-slate-500 leading-tight mb-1">100% Gemini 3.5 Flash-Lite. Máxima velocidade.</div>
-                        <div className="text-[11px] font-bold text-emerald-700">~R$ 0,17 / aula</div>
-                      </div>
-                    </label>
+                      <div className="text-[10px] text-slate-500 leading-tight mb-1">100% Gemini 3.5 Flash-Lite. Máxima velocidade e custo mínimo.</div>
+                      <div className="text-[11px] font-bold text-emerald-700">~R$ 0,17 / aula</div>
+                    </div>
                   </div>
                 </div>
 
