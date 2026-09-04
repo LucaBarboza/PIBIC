@@ -58,13 +58,14 @@ def _parse_firebase_credentials(raw_val: str) -> dict:
     raise ValueError(f"Formato de credencial inválido (tamanho: {len(s)})")
 
 # Inicialização do Firebase Admin
+firebase_error = None
 try:
     cred = None
-    if os.environ.get("FIREBASE_CREDENTIALS"):
-        cred_dict = _parse_firebase_credentials(os.environ.get("FIREBASE_CREDENTIALS"))
-        cred = credentials.Certificate(cred_dict)
-    elif os.environ.get("FIREBASE_CREDENTIALS_BASE64"):
+    if os.environ.get("FIREBASE_CREDENTIALS_BASE64"):
         cred_dict = _parse_firebase_credentials(os.environ.get("FIREBASE_CREDENTIALS_BASE64"))
+        cred = credentials.Certificate(cred_dict)
+    elif os.environ.get("FIREBASE_CREDENTIALS"):
+        cred_dict = _parse_firebase_credentials(os.environ.get("FIREBASE_CREDENTIALS"))
         cred = credentials.Certificate(cred_dict)
     else:
         cred_path = os.path.join(os.path.dirname(__file__), "serviceAccountKey.json")
@@ -81,6 +82,7 @@ try:
     db = firestore.client()
     print("[OK] Firebase Admin inicializado com sucesso.")
 except Exception as e:
+    firebase_error = str(e)
     print(f"[ERRO] Falha ao inicializar o Firebase: {e}")
     db = None
 
@@ -325,7 +327,13 @@ def processar_semestre_background(req: SemestreRequest):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "firebase": db is not None}
+    return {
+        "status": "ok", 
+        "firebase": db is not None,
+        "firebase_error": firebase_error,
+        "env_firebase_set": bool(os.environ.get("FIREBASE_CREDENTIALS") or os.environ.get("FIREBASE_CREDENTIALS_BASE64")),
+        "env_gemini_set": bool(os.environ.get("GEMINI_API_KEY"))
+    }
 
 @app.post("/api/gerar_semestre")
 def gerar_semestre(req: SemestreRequest, background_tasks: BackgroundTasks):
