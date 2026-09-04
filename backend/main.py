@@ -87,19 +87,47 @@ def log_debug(sala_id, msg):
             })
     except Exception:
         pass
-    print(msg)
+def obter_ementa_texto(id_disciplina: str):
+    """Busca ementa no Firestore com fallback automático para os PDFs locais da pasta ementas/"""
+    try:
+        if db:
+            disc_ref = db.collection("disciplinas").document(id_disciplina).get()
+            if disc_ref.exists:
+                d = disc_ref.to_dict()
+                return d.get("ementa_texto", ""), d.get("nome", id_disciplina)
+    except Exception as e:
+        print(f"[ALERTA] Falha ao ler disciplina no Firestore ({e}). Usando fallback local...")
+
+    ementas_dir = os.path.join(os.path.dirname(__file__), "ementas")
+    if os.path.exists(ementas_dir):
+        for fname in os.listdir(ementas_dir):
+            if fname.lower().startswith(id_disciplina.lower()) and fname.endswith(".pdf"):
+                try:
+                    fpath = os.path.join(ementas_dir, fname)
+                    with open(fpath, "rb") as f:
+                        reader = pypdf.PdfReader(f)
+                        texto = "\n".join([p.extract_text() for p in reader.pages if p.extract_text()])
+                        if texto:
+                            print(f"[FALLBACK] Ementa da disciplina {id_disciplina} carregada direto do PDF local: {fname}")
+                            return texto, id_disciplina
+                except Exception as e:
+                    print(f"[ERRO] Falha ao ler PDF local {fname}: {e}")
+
+    return "", id_disciplina
 
 def processar_semestre_background(req: SemestreRequest):
     print(f"[BACKGROUND] Iniciando orquestração do semestre para a sala: {req.id_sala}")
     try:
-        # 1. Recuperar ementa do Firestore
-        disc_ref = db.collection("disciplinas").document(req.id_disciplina).get()
-        if not disc_ref.exists:
-            db.collection("classrooms").document(req.id_sala).update({"status": "erro_disciplina_nao_encontrada"})
+        # 1. Recuperar ementa (Firestore ou Fallback PDF)
+        ementa_texto, nome_disciplina = obter_ementa_texto(req.id_disciplina)
+        if not ementa_texto and req.modo != "manual" and not req.arquivo_global_pdf:
+            if db:
+                try:
+                    db.collection("classrooms").document(req.id_sala).update({"status": "erro_disciplina_nao_encontrada"})
+                except Exception:
+                    pass
+            print(f"[ERRO] Ementa para disciplina {req.id_disciplina} não encontrada.")
             return
-        
-        ementa_texto = disc_ref.to_dict().get("ementa_texto", "")
-        nome_disciplina = disc_ref.to_dict().get("nome", req.id_disciplina)
         
         cronograma = []
         
