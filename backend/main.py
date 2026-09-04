@@ -19,12 +19,21 @@ from logger_agentes import AgentLogger
 
 # Inicialização do Firebase Admin
 try:
+    cred = None
     if os.environ.get("FIREBASE_CREDENTIALS"):
-        # Modo Produção: Ler da Variável de Ambiente (Render.com)
-        cred_dict = json.loads(os.environ.get("FIREBASE_CREDENTIALS"))
+        cred_raw = os.environ.get("FIREBASE_CREDENTIALS").strip()
+        try:
+            cred_dict = json.loads(cred_raw)
+        except Exception:
+            import base64
+            cred_dict = json.loads(base64.b64decode(cred_raw).decode('utf-8'))
+        cred = credentials.Certificate(cred_dict)
+    elif os.environ.get("FIREBASE_CREDENTIALS_BASE64"):
+        import base64
+        cred_raw = os.environ.get("FIREBASE_CREDENTIALS_BASE64").strip()
+        cred_dict = json.loads(base64.b64decode(cred_raw).decode('utf-8'))
         cred = credentials.Certificate(cred_dict)
     else:
-        # Modo Local: Ler do Arquivo
         cred_path = os.path.join(os.path.dirname(__file__), "serviceAccountKey.json")
         if os.path.exists(cred_path):
             cred = credentials.Certificate(cred_path)
