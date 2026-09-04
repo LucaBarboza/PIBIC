@@ -31,8 +31,8 @@ def gerar_conteudo_aula(nome_professor: str, codigo_disciplina: str, tema_solici
     
     try:
         client = get_genai_client()
-        modelo_roteirista = "gemini-pro-latest"
-        modelo_escritor = "gemini-pro-latest" if str(modelo_llm) == "pro" else "gemini-flash-latest"
+        modelo_roteirista = "gemini-3.5-flash-lite"
+        modelo_escritor = "gemini-pro-latest" if str(modelo_llm) == "pro" else "gemini-3.5-flash-lite"
 
     except Exception as e:
         if logger:
@@ -76,7 +76,7 @@ def gerar_conteudo_aula(nome_professor: str, codigo_disciplina: str, tema_solici
     # FASE 1: AGENTE 1 - O ROTEIRISTA DA EMENTA (Gemini 2.5 Pro)
     # ==============================================================================
     t_inicio_roteirista = time.time()
-    print("\n[Agente 1 - Roteirista (gemini-2.5-pro)] Analisando a ementa e estruturando a trilha pedagógica da aula...")
+    print(f"\n[Agente 1 - Roteirista ({modelo_roteirista})] Analisando a ementa e estruturando a trilha pedagógica da aula...")
     
     prompt_roteirista = f"""
 Você é um Designer Instrucional Especialista em Ensino Superior de Matemática e Estatística, com foco em modelagem de currículos acadêmicos rigorosos.

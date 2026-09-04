@@ -31,7 +31,7 @@ def gerar_caderno_exercicios(conteudo_aula_json: dict, logger=None, modelo_llm="
     garantindo a saída como um dicionário JSON compatível com o schema CadernoExerciciosValidado.
     """
     client = get_genai_client()
-    target_model = "gemini-pro-latest" if str(modelo_llm) == "pro" else "gemini-flash-latest"
+    target_model = "gemini-pro-latest" if str(modelo_llm) == "pro" else "gemini-3.5-flash-lite"
     
     # Reduzindo o conteúdo apenas para os textos essenciais para economizar tokens
     resumo_aula = f"Tema: {conteudo_aula_json.get('tema_global', 'Aula')}\n"

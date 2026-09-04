@@ -59,7 +59,7 @@ DIRETRIZ DE APROFUNDAMENTO (MANDATÓRIO):
 
             def chamar_macro():
                 return self.client.models.generate_content(
-                    model="gemini-pro-latest",
+                    model="gemini-3.5-flash-lite",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=self.system_instruction,

@@ -64,7 +64,7 @@ def lapidar_conteudo_global(payload_bruto: dict, logger=None):
             
         def chamar_orquestrador():
             return client.models.generate_content(
-                model="gemini-pro-latest",
+                model="gemini-3.5-flash-lite",
                 contents=[dados_entrada_str, prompt_editorial],
                 config=config_editorial
             )
@@ -109,7 +109,7 @@ def formatar_latex_final(aula_json: dict, client) -> dict:
     try:
         dados_str = json.dumps(aula_json, ensure_ascii=False)
         resposta_formatada = client.models.generate_content(
-            model="gemini-pro-latest",
+            model="gemini-3.5-flash-lite",
             contents=[dados_str, PROMPT_FORMATADOR_LATEX],
             config=config_formatador
         )
@@ -126,7 +126,7 @@ def expandir_subtopico_para_prosa_livro(dados_subtopico: dict) -> str:
     prompt = PROMPT_PROFESSOR_EXPANSOR.replace("{dicionario_latex}", DICIONARIO_LATEX)
     
     resposta = client.models.generate_content(
-        model="gemini-pro-latest",
+        model="gemini-3.5-flash-lite",
         contents=[json.dumps(dados_subtopico, ensure_ascii=False), prompt],
         config=types.GenerateContentConfig(
             response_mime_type="text/plain"

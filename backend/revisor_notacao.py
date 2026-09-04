@@ -87,7 +87,7 @@ def auditar_subtopico_local(bloco_bruto_dict: dict, diretrizes_texto: str, logge
     try:
         def chamar_revisor():
             return client.models.generate_content(
-                model="gemini-pro-latest",
+                model="gemini-3.5-flash-lite",
                 contents=[bloco_bruto_str, prompt_revisor],
                 config=config_revisor
             )

@@ -413,7 +413,7 @@ def api_editar_aula_bloco(req: EditarBlocoRequest):
             from client_factory import get_genai_client
             client = get_genai_client()
             resp = client.models.generate_content(
-                model='gemini-flash-latest',
+                model='gemini-3.5-flash-lite',
                 contents=f"Reescreva o seguinte texto baseando-se nestas instruções do professor: '{req.prompt_ia}'.\n\nTexto atual:\n{req.novo_conteudo}"
             )
             if resp.text:

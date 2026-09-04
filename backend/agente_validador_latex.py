@@ -161,7 +161,7 @@ def substituir_no_caminho(obj, caminho: str, novo_valor: str) -> bool:
 
     return False
 
-def reparar_anomalias_cirurgico(aula_sanitizada: dict, anomalias: list, logger=None, target_model="gemini-flash-latest") -> dict:
+def reparar_anomalias_cirurgico(aula_sanitizada: dict, anomalias: list, logger=None, target_model="gemini-3.5-flash-lite") -> dict:
     """
     Envia APENAS as anomalias capturadas no Passo 1 para o LLM e aplica as correções cirurgicamente
     no JSON original sem tocar no resto da aula. Usa fallback imediato para nunca travar o pipeline.
@@ -248,7 +248,7 @@ def validar_e_corrigir_aula_completa(aula_json: dict, logger=None, modelo_llm: s
     if not aula_json or not isinstance(aula_json, dict):
         return aula_json
         
-    target_model = "gemini-2.5-flash"
+    target_model = "gemini-3.5-flash-lite"
     
     try:
         if logger:

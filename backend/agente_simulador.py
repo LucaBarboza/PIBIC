@@ -160,7 +160,7 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, logger=None) -> st
         
         def chamar_simulador():
             return client.models.generate_content(
-                model="gemini-pro-latest",
+                model="gemini-3.5-flash-lite",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
