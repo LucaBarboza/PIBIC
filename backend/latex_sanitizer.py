@@ -132,12 +132,24 @@ def sanitize_latex_string(text: str) -> str:
 def sanitize_json_recursively(obj):
     """
     Percorre recursivamente um dicionário ou lista JSON e aplica sanitize_latex_string em cada campo de texto,
-    preservando intactos códigos brutos como 'codigo_html_gerado'.
+    preservando intactos códigos brutos como 'codigo_html_gerado' e garantindo delimitadores $$ em 'formalismo_latex'.
     """
     if isinstance(obj, str):
         return sanitize_latex_string(obj)
     elif isinstance(obj, dict):
-        return {k: (v if k == "codigo_html_gerado" else sanitize_json_recursively(v)) for k, v in obj.items()}
+        res = {}
+        for k, v in obj.items():
+            if k == "codigo_html_gerado":
+                res[k] = v
+            elif k == "formalismo_latex" and isinstance(v, str) and v.strip() and v.strip().lower() != "null":
+                f = v.strip()
+                if not f.startswith("$$"):
+                    f = re.sub(r'^\$+|\$+$', '', f).strip()
+                    f = f"$$\n{f}\n$$"
+                res[k] = sanitize_latex_string(f)
+            else:
+                res[k] = sanitize_json_recursively(v)
+        return res
     elif isinstance(obj, list):
         return [sanitize_json_recursively(elem) for elem in obj]
     return obj

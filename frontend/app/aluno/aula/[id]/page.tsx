@@ -372,7 +372,7 @@ export default function SemesterViewer() {
                             <span className="text-blue-800 font-bold block mb-2 text-xs sm:text-sm uppercase tracking-wider">Fórmula / Definição Formal</span>
                             <div className="text-base sm:text-lg text-left inline-block w-full break-words overflow-x-auto max-w-full pb-2">
                               <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, {strict: false}]]}>
-                                {processLatex(latexCode.startsWith('$$') || latexCode.startsWith('$') ? latexCode : `$$\n${latexCode}\n$$`)}
+                                {processLatex(latexCode.trim().startsWith('$$') ? latexCode : `$$\n${latexCode.replace(/^\$+|\$+$/g, '').trim()}\n$$`)}
                               </ReactMarkdown>
                             </div>
                           </div>
