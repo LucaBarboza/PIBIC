@@ -77,26 +77,23 @@ class SemestreRequest(BaseModel):
     aulas_manuais: Optional[List[AulaManual]] = []
 
 import time
-from google.cloud import firestore
+from storage import StorageManager
+storage = StorageManager(db=db)
 
 def log_debug(sala_id, msg):
+    print(f"[{sala_id}] {msg}")
     try:
-        if db:
-            db.collection("classrooms").document(sala_id).update({
-                "debug_logs": firestore.ArrayUnion([f"{time.strftime('%H:%M:%S')} - {msg}"])
-            })
+        storage.update_classroom(sala_id, {
+            "debug_logs": firestore.ArrayUnion([f"{time.strftime('%H:%M:%S')} - {msg}"]) if db else [f"{time.strftime('%H:%M:%S')} - {msg}"]
+        })
     except Exception:
         pass
+
 def obter_ementa_texto(id_disciplina: str):
     """Busca ementa no Firestore com fallback automático para os PDFs locais da pasta ementas/"""
-    try:
-        if db:
-            disc_ref = db.collection("disciplinas").document(id_disciplina).get()
-            if disc_ref.exists:
-                d = disc_ref.to_dict()
-                return d.get("ementa_texto", ""), d.get("nome", id_disciplina)
-    except Exception as e:
-        print(f"[ALERTA] Falha ao ler disciplina no Firestore ({e}). Usando fallback local...")
+    disc_data = storage.get_disciplina(id_disciplina)
+    if disc_data and disc_data.get("ementa_texto"):
+        return disc_data["ementa_texto"], disc_data.get("nome", id_disciplina)
 
     ementas_dir = os.path.join(os.path.dirname(__file__), "ementas")
     if os.path.exists(ementas_dir):
@@ -121,11 +118,7 @@ def processar_semestre_background(req: SemestreRequest):
         # 1. Recuperar ementa (Firestore ou Fallback PDF)
         ementa_texto, nome_disciplina = obter_ementa_texto(req.id_disciplina)
         if not ementa_texto and req.modo != "manual" and not req.arquivo_global_pdf:
-            if db:
-                try:
-                    db.collection("classrooms").document(req.id_sala).update({"status": "erro_disciplina_nao_encontrada"})
-                except Exception:
-                    pass
+            storage.update_classroom(req.id_sala, {"status": "erro_disciplina_nao_encontrada"})
             print(f"[ERRO] Ementa para disciplina {req.id_disciplina} não encontrada.")
             return
         
@@ -134,7 +127,7 @@ def processar_semestre_background(req: SemestreRequest):
         if req.modo == "manual" or req.modo == "livre":
             if req.tipo_crie_seu_jeito == "bloco_a_bloco" and req.aulas_manuais:
                 log_debug(req.id_sala, "Modo Manual: Utilizando blocos fornecidos pelo professor.")
-                db.collection("classrooms").document(req.id_sala).update({"status": "processando_aulas_manuais"})
+                storage.update_classroom(req.id_sala, {"status": "processando_aulas_manuais"})
                 for idx, aula_manual in enumerate(req.aulas_manuais):
                     cronograma.append({
                         "numero_aula": idx + 1,
@@ -148,7 +141,7 @@ def processar_semestre_background(req: SemestreRequest):
                     })
             elif req.tipo_crie_seu_jeito == "automatico":
                 print("[BACKGROUND] Modo Crie do Seu Jeito Automático: Usando PDF do professor como ementa.")
-                db.collection("classrooms").document(req.id_sala).update({"status": "fatiando_ementa_pdf"})
+                storage.update_classroom(req.id_sala, {"status": "fatiando_ementa_pdf"})
                 macro = MacroRoteirista()
                 cronograma = macro.gerar_cronograma(
                     ementa_texto=req.arquivo_global_pdf, 
@@ -158,12 +151,12 @@ def processar_semestre_background(req: SemestreRequest):
                     max_aulas=req.max_aulas
                 )
                 if not cronograma:
-                    db.collection("classrooms").document(req.id_sala).update({"status": "erro_macro_roteirista"})
+                    storage.update_classroom(req.id_sala, {"status": "erro_macro_roteirista"})
                     return
         else:
             # 2. Agente Macro Roteirista fatia o semestre
             log_debug(req.id_sala, "Acionando Macro Roteirista para fatiar o semestre...")
-            db.collection("classrooms").document(req.id_sala).update({"status": "fatiando_ementa"})
+            storage.update_classroom(req.id_sala, {"status": "fatiando_ementa"})
             
             macro = MacroRoteirista()
             cronograma = macro.gerar_cronograma(
@@ -175,11 +168,11 @@ def processar_semestre_background(req: SemestreRequest):
             )
             
             if not cronograma:
-                db.collection("classrooms").document(req.id_sala).update({"status": "erro_macro_roteirista"})
+                storage.update_classroom(req.id_sala, {"status": "erro_macro_roteirista"})
                 return
             
         # Salva o cronograma mestre na sala
-        db.collection("classrooms").document(req.id_sala).update({
+        storage.update_classroom(req.id_sala, {
             "cronograma_oficial": cronograma,
             "status": "gerando_aulas",
             "total_aulas": len(cronograma),
@@ -205,7 +198,7 @@ def processar_semestre_background(req: SemestreRequest):
             topicos_proibidos = ", ".join(topicos_proibidos_lista)
             
             # Constrói o "Tema Global" para a Fábrica
-            tema_montado = f"Disciplina: {nome_disciplina}. Aula: {titulo}. Objetivo: {objetivo}. T?picos: {topicos}"
+            tema_montado = f"Disciplina: {nome_disciplina}. Aula: {titulo}. Objetivo: {objetivo}. Tópicos: {topicos}"
             log_debug(req.id_sala, f"Gerando Aula {numero}: {titulo}...")
             
             # Pipeline de Redação
@@ -257,20 +250,15 @@ def processar_semestre_background(req: SemestreRequest):
                     )
 
                     # Valida LaTeX antes de salvar
-                    db.collection("classrooms").document(req.id_sala).update({"detalhe_progresso": f"Aula {numero}: Agente Validador LaTeX (Fase Final)..."})
+                    storage.update_classroom(req.id_sala, {"detalhe_progresso": f"Aula {numero}: Agente Validador LaTeX (Fase Final)..."})
                     conteudo_final = agente_validador_latex.validar_e_corrigir_aula_completa(conteudo_final, logger=logger, modelo_llm=req.modelo_llm)
 
-                    # Salva a aula na subcoleção do Firestore
-                    db.collection("classrooms").document(req.id_sala).collection("aulas").document(str(numero)).set({
+                    # Salva a aula no Storage (Firestore e Local)
+                    storage.save_aula(req.id_sala, numero, {
                         "numero_aula": numero,
                         "titulo": titulo,
                         "conteudo_json": conteudo_final,
                         "publicada": False
-                    })
-                    
-                    # Atualiza progresso
-                    db.collection("classrooms").document(req.id_sala).update({
-                        "aulas_geradas": firestore.Increment(1)
                     })
                 else:
                     raise Exception(f"Falha na lapidação (orquestrador) para a aula {numero}")
@@ -278,13 +266,12 @@ def processar_semestre_background(req: SemestreRequest):
                 raise Exception(f"API do Gemini bloqueada ou falhou ao gerar o conteúdo bruto da aula {numero}. Verifique os logs.")
         
         # 4. Finalização
-        db.collection("classrooms").document(req.id_sala).update({"status": "pronto"})
+        storage.update_classroom(req.id_sala, {"status": "pronto"})
         print(f"[BACKGROUND] Semestre {req.id_sala} concluído com sucesso!")
         
     except Exception as e:
         print(f"[ERRO] Exceção no semestre background: {e}")
-        if db:
-            db.collection("classrooms").document(req.id_sala).update({"status": f"erro: {str(e)}"})
+        storage.update_classroom(req.id_sala, {"status": f"erro: {str(e)}"})
 
 @app.get("/health")
 def health_check():
