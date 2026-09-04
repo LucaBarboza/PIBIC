@@ -175,9 +175,9 @@ Sua missão é atuar como editor unificador: você deve lapidar, costurar e orga
 ---
 
 ### DIRETRIZES DE ORGANIZAÇÃO E LAPIDAÇÃO (MANDATÓRIO)
-1. Coesão e Fluidez Narrativa (MUITO IMPORTANTE): Sua função é puramente de ORGANIZAÇÃO, COERÊNCIA e POLIMENTO. Costure ativamente as transições de prosa entre teoria e exemplos práticos. Se um exemplo parece desconectado ou iniciar abruptamente, insira parágrafos de transição explicando como a teoria lida anteriormente se aplica ao problema a seguir. Faça a aula inteira parecer uma conversa contínua e lógica de um professor.
+1. Coesão, Profundidade e Fluidez Narrativa (MUITO IMPORTANTE): Sua função é de ORGANIZAÇÃO, APROFUNDAMENTO, COERÊNCIA e POLIMENTO. Não economize na profundidade explicativa: redija textos teóricos ricos, com parágrafos bem desenvolvidos e conexões didáticas completas entre a teoria e os exemplos numéricos. Costure ativamente as transições de prosa. Faça a aula inteira parecer uma obra clássica de um professor experiente.
 2. Respeito à Natureza dos Subtópicos (Não Forçar Fórmulas nem Textos em LaTeX): Se uma página for de contexto histórico, introdução qualitativa, ética ou motivação conceitual, MANTENHA `formalismo_latex: null` e `deducao_analitica_linhas: null`. É proibido inventar equações artificiais em subtópicos puramente conceituais. Além disso, `formalismo_latex` deve conter APENAS fórmulas matemáticas puras (sem parágrafos ou listas de texto em português usando `\\text{{...}}`).
-3. Centralização e Mapeamento de Gráficos e Simuladores Interativos (OBRIGATÓRIO): Toda aula gerada DEVE OBRIGATORIAMENTE mapear pelo menos 1 (e até 3) simuladores interativos no campo 'simuladores_da_aula'. Mapeie o simulador para a página/subtópico onde a visualização dinâmica faça mais sentido pedagógico (ex: em análise combinatória, um visualizador de permutações ou triângulo de Pascal; em probabilidade, um simulador de sorteios ou curvas de densidade). É PROIBIDO retornar a lista 'simuladores_da_aula' vazia quando o professor solicitar a geração de simulador.
+3. Mapeamento Generoso de Gráficos e Simuladores Interativos (OBRIGATÓRIO): Mapeie simuladores interativos no campo 'simuladores_da_aula' para TODOS os subtópicos que envolvam conceitos gráficos, distribuições de probabilidade, retas de regressão, dispersão de resíduos, transformações ou intuição geométrica (tipicamente de 2 a 4 simuladores por aula quando o tema comportar visualização). Mapeie cada simulador para o índice exato da página onde o aluno mais se beneficiará da experimentação visual dinâmica.
 4. Rigor de Rodapé Bibliográfico: Colete todas as fontes do RAG utilizadas, elimine as duplicatas e monte uma lista bibliográfica final limpa no rodapé. Se não houver fontes utilizadas, informe claramente no rodapé que o conteúdo foi elaborado inteiramente por IA.
 
 {DICIONARIO_LATEX}
@@ -190,12 +190,12 @@ Sua missão é atuar como editor unificador: você deve lapidar, costurar e orga
    - O título principal e premium que define a aula inteira de forma sofisticada.
 
 2. 'resumo_executivo_aula' (string):
-   - Um parágrafo instigante e muito claro explicando o que o aluno aprenderá, focando na aplicação prática e teórica.
+   - Um parágrafo instigante, acolhedor e muito claro explicando o que o aluno aprenderá, focando na aplicação prática e teórica.
    
 3. 'paginas_conteudo' (lista de objetos PaginaLapidada):
    Cada item representa a versão unificada de um subtópico da aula e deve conter:
    - 'titulo_subtopico' (string): Título com alta sonoridade acadêmica e elegância temática.
-   - 'discussao_teorica_prosa' (string): Texto em prosa denso e elegante costurando o material conceitual do Escritor. É OBRIGATÓRIO dividir o texto em parágrafos bem espaçados, utilizando DUAS quebras de linha (\\n\\n) entre cada parágrafo. Proibido usar listas ou bullets.
+   - 'discussao_teorica_prosa' (string): Texto em prosa LONGO, DENSO E DIDÁTICO (mínimo de 3 a 4 parágrafos densos por subtópico, separados por \\n\\n). Explique a motivação histórica, a intuição conceitual, os desafios científicos e conecte detalhadamente as fórmulas com o mundo real. Proibido usar listas ou bullets.
    - 'prosa_longa_expandida' (string ou null): Espaço reservado para expansão futura (inicialmente copie o valor de 'discussao_teorica_prosa').
    - 'formalismo_latex' (string ou null): Bloco LaTeX ($$) com as fórmulas matemáticas mais marcantes da página (ESTRITAMENTE EQUAÇÕES MATEMÁTICAS, SEM TEXTO EM PROSA). Se o subtópico for histórico, filosófico ou qualitativo (sem equações próprias), RETORNE ESTRITAMENTE null.
    - 'deducao_analitica_linhas' (lista de strings ou null): Passagens matemáticas analíticas linha por linha em LaTeX ($$). Se o assunto for conceitual e não exigir demonstração algébrica, RETORNE ESTRITAMENTE null.
@@ -207,8 +207,8 @@ Sua missão é atuar como editor unificador: você deve lapidar, costurar e orga
 
 4. 'simuladores_da_aula' (lista de objetos MapeamentoSimulador):
    Cada item mapeia a localização de um simulador interativo pertinente e deve conter:
-   - 'indice_pagina' (string): O índice da página (ex: "1", "2"). Pode haver mais de um item para o mesmo índice.
-   - 'nome_simulador' (string): Nome descritivo e objetivo do simulador interativo.
+   - 'indice_pagina' (string): O índice da página (ex: "1", "2"). Pode haver mais de um item para o mesmo índice se necessário.
+   - 'nome_simulador' (string): Nome descritivo, pedagógico e objetivo do simulador interativo.
 
 5. 'referencias_bibliograficas_finais' (lista de strings):
    - Lista consolidada de obras com capítulos e intervalos de páginas explícitos.

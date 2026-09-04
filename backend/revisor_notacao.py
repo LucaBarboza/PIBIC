@@ -55,6 +55,10 @@ class DecisaoRevisao(BaseModel):
     aprovado: bool = Field(
         description="True se o conteúdo está correto e consistente com as diretrizes. False se precisa de correções."
     )
+    comentario_correcao: Optional[str] = Field(
+        default=None,
+        description="Laudo técnico cirúrgico detalhando cada desvio conceitual encontrado e as correções necessárias se aprovado for False."
+    )
     feedback_melhoria: Optional[str] = Field(
         default=None,
         description="Explicação detalhada dos pontos que violaram as diretrizes ou que contêm erros de notação."
