@@ -25,13 +25,14 @@ Sua missão é ler o conteúdo de uma aula recém-criada e elaborar um caderno d
 5. Assegure que não há ambiguidades nas alternativas e que a alternativa correta seja matematicamente inquestionável.
 """
 
-def gerar_caderno_exercicios(conteudo_aula_json: dict, logger=None, modelo_llm="2.5", diretrizes_override=None) -> dict:
+def gerar_caderno_exercicios(conteudo_aula_json: dict, logger=None, modelo_llm="hibrido", diretrizes_override=None, tracker=None) -> dict:
     """
     Recebe a aula unificada e lapidada e gera o Caderno de Exercícios correspondente,
     garantindo a saída como um dicionário JSON compatível com o schema CadernoExerciciosValidado.
     """
     client = get_genai_client()
-    target_model = "gemini-pro-latest" if str(modelo_llm) == "pro" else "gemini-3.5-flash-lite"
+    from telemetry import resolver_modelo
+    target_model = resolver_modelo("exercicios", modelo_llm)
     
     # Reduzindo o conteúdo apenas para os textos essenciais para economizar tokens
     resumo_aula = f"Tema: {conteudo_aula_json.get('tema_global', 'Aula')}\n"
@@ -68,7 +69,9 @@ def gerar_caderno_exercicios(conteudo_aula_json: dict, logger=None, modelo_llm="
             max_retries=5,
             logger=logger,
             nome_agente="Exercícios",
-            descricao="elaboração do caderno de exercícios"
+            descricao="elaboração do caderno de exercícios",
+            tracker=tracker,
+            modelo=target_model
         )
         
         import latex_sanitizer

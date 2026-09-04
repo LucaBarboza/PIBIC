@@ -67,14 +67,15 @@ class DecisaoRevisao(BaseModel):
 # ==============================================================================
 # FUNÇÃO DE AUDITORIA DO SUBTÓPICO
 # ==============================================================================
-def auditar_subtopico_local(bloco_bruto_dict: dict, diretrizes_texto: str, logger=None, sub_idx=None, sub_tentativa=None) -> DecisaoRevisao:
+def auditar_subtopico_local(bloco_bruto_dict: dict, diretrizes_texto: str, logger=None, sub_idx=None, sub_tentativa=None, modelo_llm: str = "hibrido", tracker=None) -> DecisaoRevisao:
     client = get_genai_client()
     
     bloco_bruto_str = json.dumps(bloco_bruto_dict, ensure_ascii=False, indent=2)
 
     from prompts import PROMPT_REVISOR_CIENTIFICO, DICIONARIO_LATEX
-    # Nota: No prompts.py o DICIONARIO_LATEX já está formatado dentro do PROMPT_REVISOR_CIENTIFICO, 
-    # ou podemos simplesmente substituir se o string template precisar
+    from telemetry import resolver_modelo
+    modelo_alvo = resolver_modelo("revisor", modelo_llm)
+    
     prompt_revisor = PROMPT_REVISOR_CIENTIFICO.replace("[CONTEÚDO_BRUTO]", bloco_bruto_str).replace("[DIRETRIZES_DE_ESTILO]", diretrizes_texto)
 
     config_revisor = types.GenerateContentConfig(
@@ -87,7 +88,7 @@ def auditar_subtopico_local(bloco_bruto_dict: dict, diretrizes_texto: str, logge
     try:
         def chamar_revisor():
             return client.models.generate_content(
-                model="gemini-3.5-flash-lite",
+                model=modelo_alvo,
                 contents=[bloco_bruto_str, prompt_revisor],
                 config=config_revisor
             )
@@ -97,7 +98,9 @@ def auditar_subtopico_local(bloco_bruto_dict: dict, diretrizes_texto: str, logge
             max_retries=5,
             logger=logger,
             nome_agente=f"Revisor_{sub_idx}" if sub_idx else "Revisor",
-            descricao=f"auditoria do subtópico {sub_idx}" if sub_idx else "auditoria do subtópico"
+            descricao=f"auditoria do subtópico {sub_idx}" if sub_idx else "auditoria do subtópico",
+            tracker=tracker,
+            modelo=modelo_alvo
         )
 
         if logger:

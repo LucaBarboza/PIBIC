@@ -224,6 +224,9 @@ def processar_semestre_background(req: SemestreRequest):
                     override_prompt_block = agente_extrator.formatar_override_para_prompt(override_dict)
                     diretrizes = f"{override_prompt_block}\n\n{diretrizes}"
             
+            from telemetry import TokenTracker
+            tracker = TokenTracker(modo_llm=req.modelo_llm)
+
             conteudo_bruto = gerador_conteudo.gerar_conteudo_aula(
                 nome_professor="Professor UFBA",
                 codigo_disciplina=req.id_disciplina,
@@ -231,11 +234,12 @@ def processar_semestre_background(req: SemestreRequest):
                 ementa_texto=ementa_texto,
                 diretrizes_texto=diretrizes,
                 logger=logger,
-                modelo_llm=req.modelo_llm
+                modelo_llm=req.modelo_llm,
+                tracker=tracker
             )
             
             if conteudo_bruto:
-                conteudo_final = orquestrador_editorial.lapidar_conteudo_global(conteudo_bruto, logger=logger)
+                conteudo_final = orquestrador_editorial.lapidar_conteudo_global(conteudo_bruto, logger=logger, modelo_llm=req.modelo_llm, tracker=tracker)
                 if conteudo_final:
                     flag_exercicios = aula.get("gerar_exercicios", True)
                     flag_simulador = aula.get("gerar_simulador", True)
@@ -246,12 +250,16 @@ def processar_semestre_background(req: SemestreRequest):
                         diretrizes_override=override_prompt_block,
                         logger=logger,
                         flag_exercicios=flag_exercicios,
-                        flag_simulador=flag_simulador
+                        flag_simulador=flag_simulador,
+                        tracker=tracker
                     )
 
                     # Valida LaTeX antes de salvar
                     storage.update_classroom(req.id_sala, {"detalhe_progresso": f"Aula {numero}: Agente Validador LaTeX (Fase Final)..."})
-                    conteudo_final = agente_validador_latex.validar_e_corrigir_aula_completa(conteudo_final, logger=logger, modelo_llm=req.modelo_llm)
+                    conteudo_final = agente_validador_latex.validar_e_corrigir_aula_completa(conteudo_final, logger=logger, modelo_llm=req.modelo_llm, tracker=tracker)
+
+                    # Anexa telemetria e custo oficial de tokens
+                    conteudo_final["telemetria_custo"] = tracker.obter_resumo()
 
                     # Salva a aula no Storage (Firestore e Local)
                     storage.save_aula(req.id_sala, numero, {
@@ -317,7 +325,7 @@ class EditarBlocoRequest(BaseModel):
     prompt_ia: str = "" # Se vier preenchido, usa IA para editar
 
 
-def rodar_agentes_paralelos(conteudo_final, titulo_aula, modelo_llm="2.5", diretrizes_override=None, logger=None, flag_exercicios=True, flag_simulador=True):
+def rodar_agentes_paralelos(conteudo_final, titulo_aula, modelo_llm="hibrido", diretrizes_override=None, logger=None, flag_exercicios=True, flag_simulador=True, tracker=None):
     import agente_exercicios
     import agente_simulador
     
@@ -326,11 +334,12 @@ def rodar_agentes_paralelos(conteudo_final, titulo_aula, modelo_llm="2.5", diret
             conteudo_final, 
             logger=logger, 
             modelo_llm=modelo_llm, 
-            diretrizes_override=diretrizes_override
+            diretrizes_override=diretrizes_override,
+            tracker=tracker
         )
         
     def task_simulador(idx_pag, nome_sim):
-        html = agente_simulador.gerar_simulador_html(titulo_aula, nome_sim, logger=logger)
+        html = agente_simulador.gerar_simulador_html(titulo_aula, nome_sim, logger=logger, modelo_llm=modelo_llm, tracker=tracker)
         if html:
             return {"indice_pagina": str(idx_pag), "nome_simulador": nome_sim, "codigo_html_gerado": html}
         return None
@@ -498,15 +507,22 @@ def processar_aula_avulsa_background(req: AulaAvulsaRequest):
                 override_prompt_block = agente_extrator.formatar_override_para_prompt(override_dict)
                 diretrizes = f"{override_prompt_block}\n\n{diretrizes}"
                 
+        from telemetry import TokenTracker
+        tracker = TokenTracker(modo_llm=req.modelo_llm)
+
         conteudo_bruto = gerador_conteudo.gerar_conteudo_aula(
             nome_professor="Professor UFBA",
             codigo_disciplina=req.id_disciplina,
             tema_solicitado=tema_montado,
             ementa_texto=ementa_texto,
-            diretrizes_texto=diretrizes, logger=logger, modelo_llm=req.modelo_llm)
+            diretrizes_texto=diretrizes, 
+            logger=logger, 
+            modelo_llm=req.modelo_llm,
+            tracker=tracker
+        )
         if conteudo_bruto:
             db.collection("classrooms").document(req.sala_id).update({"detalhe_progresso": f"Aula Avulsa: Agente Orquestrador (Fase 2/3)..."})
-            conteudo_final = orquestrador_editorial.lapidar_conteudo_global(conteudo_bruto, logger=logger)
+            conteudo_final = orquestrador_editorial.lapidar_conteudo_global(conteudo_bruto, logger=logger, modelo_llm=req.modelo_llm, tracker=tracker)
             if conteudo_final:
                 db.collection("classrooms").document(req.sala_id).update({"detalhe_progresso": f"Aula Avulsa: Agentes Paralelos (Simulador/Exercícios) (Fase 3/3)..."})
                 conteudo_final = rodar_agentes_paralelos(
@@ -514,11 +530,15 @@ def processar_aula_avulsa_background(req: AulaAvulsaRequest):
                     titulo, 
                     modelo_llm=req.modelo_llm, 
                     diretrizes_override=override_prompt_block, 
-                    logger=logger
+                    logger=logger,
+                    tracker=tracker
                 )
 
                 db.collection("classrooms").document(req.sala_id).update({"detalhe_progresso": "Aula Avulsa: Agente Validador LaTeX (Fase Final)..."})
-                conteudo_final = agente_validador_latex.validar_e_corrigir_aula_completa(conteudo_final, logger=logger, modelo_llm=req.modelo_llm)
+                conteudo_final = agente_validador_latex.validar_e_corrigir_aula_completa(conteudo_final, logger=logger, modelo_llm=req.modelo_llm, tracker=tracker)
+
+                # Anexa telemetria e custo oficial de tokens
+                conteudo_final["telemetria_custo"] = tracker.obter_resumo()
 
                 db.collection("classrooms").document(req.sala_id).collection("aulas").document(str(req.numero_aula)).set({
                     "numero_aula": req.numero_aula,

@@ -161,7 +161,7 @@ def substituir_no_caminho(obj, caminho: str, novo_valor: str) -> bool:
 
     return False
 
-def reparar_anomalias_cirurgico(aula_sanitizada: dict, anomalias: list, logger=None, target_model="gemini-3.5-flash-lite") -> dict:
+def reparar_anomalias_cirurgico(aula_sanitizada: dict, anomalias: list, logger=None, target_model="gemini-2.5-flash", tracker=None) -> dict:
     """
     Envia APENAS as anomalias capturadas no Passo 1 para o LLM e aplica as correções cirurgicamente
     no JSON original sem tocar no resto da aula. Usa fallback imediato para nunca travar o pipeline.
@@ -198,6 +198,7 @@ REGRAS RÍGIDAS DE CORREÇÃO:
     
     for tentativa in range(max_retries):
         try:
+            t0 = time.time()
             resposta = client.models.generate_content(
                 model=target_model,
                 contents=prompt_cirurgico,
@@ -206,6 +207,18 @@ REGRAS RÍGIDAS DE CORREÇÃO:
                     response_schema=RelatorioCorrecaoLatex
                 )
             )
+            t_elap = time.time() - t0
+            
+            if tracker and target_model:
+                try:
+                    tracker.registrar_chamada(
+                        nome_agente="Validador_LaTeX",
+                        modelo=target_model,
+                        response=resposta,
+                        tempo_s=t_elap
+                    )
+                except Exception:
+                    pass
             
             relatorio = RelatorioCorrecaoLatex.model_validate_json(resposta.text)
             
@@ -238,7 +251,7 @@ REGRAS RÍGIDAS DE CORREÇÃO:
         logger.log("Auditor de Compilação LaTeX: Concluído via sanitização determinística.", "success")
     return aula_sanitizada
 
-def validar_e_corrigir_aula_completa(aula_json: dict, logger=None, modelo_llm: str = "2.5") -> dict:
+def validar_e_corrigir_aula_completa(aula_json: dict, logger=None, modelo_llm: str = "hibrido", tracker=None) -> dict:
     """
     Agente Validador e Auditor Final de Compilação LaTeX.
     Passo 1: Aplica a sanitização determinística instantânea em Python (< 1ms).
@@ -248,20 +261,41 @@ def validar_e_corrigir_aula_completa(aula_json: dict, logger=None, modelo_llm: s
     if not aula_json or not isinstance(aula_json, dict):
         return aula_json
         
-    target_model = "gemini-3.5-flash-lite"
+    from telemetry import resolver_modelo
+    target_model = resolver_modelo("validador_latex", modelo_llm)
     
     try:
         if logger:
             logger.update_agent("validador_latex", "rodando")
-            logger.log(f"Auditor de Compilação LaTeX: Inspecionando sintaxe e KaTeX...", "info")
+            logger.log(f"Auditor de Compilação LaTeX ({target_model}): Inspecionando sintaxe e KaTeX...", "info")
             
-        print(f"\n[Agente Validador de LaTeX] Inspecionando compilação de toda a aula...")
+        print(f"\n[Agente Validador de LaTeX ({target_model})] Inspecionando compilação de toda a aula...")
         
         # 1. Sanitização determinística automática em Python (< 1ms)
         aula_sanitizada = latex_sanitizer.sanitize_json_recursively(aula_json)
         
         # 2. Mapeamento estruturado de anomalias (Passo 1)
         anomalias_encontradas = mapear_todas_anomalias_json(aula_sanitizada)
+        
+        # Se anomalias foram detectadas, invoca o LLM com o relatório cirúrgico (Passo 2)
+        if anomalias_encontradas:
+            print(f"   -> [ALERTA KATEX] Detectadas {len(anomalias_encontradas)} anomalias reais no JSON. Acionando reparo cirúrgico...")
+            if logger:
+                logger.log(f"Validador LaTeX: Detectadas {len(anomalias_encontradas)} anomalias reais. Iniciando reparo cirúrgico...", "warning")
+            return reparar_anomalias_cirurgico(aula_sanitizada, anomalias_encontradas, logger=logger, target_model=target_model, tracker=tracker)
+        else:
+            print(" [OK] Auditoria KaTeX concluída: 0 anomalias encontradas na aula!")
+            if logger:
+                logger.update_agent("validador_latex", "concluido")
+                logger.log("Auditor de Compilação LaTeX: 100% livre de anomalias!", "success")
+            return aula_sanitizada
+            
+    except Exception as e:
+        print(f" [AVISO] Falha na auditoria avançada de LaTeX: {e}. Mantendo versão com sanitização determinística.")
+        if logger:
+            logger.update_agent("validador_latex", "concluido")
+            logger.log("Auditor de Compilação LaTeX: Concluído com segurança.", "success")
+        return latex_sanitizer.sanitize_json_recursively(aula_json)
         
         # Se nenhuma anomalia grave foi encontrada, retorna imediatamente (0ms latência extra!)
         if not anomalias_encontradas:

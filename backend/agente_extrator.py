@@ -30,7 +30,7 @@ DOCUMENTO DO PROFESSOR:
 {texto_documento}
 """
 
-def extrair_regras_override(texto_documento: str, logger=None) -> Optional[Dict]:
+def extrair_regras_override(texto_documento: str, logger=None, modelo_llm: str = "hibrido", tracker=None) -> Optional[Dict]:
     """
     Lê o texto/documento de notações/diretrizes do professor e usa o Gemini 2.5 Flash
     com Structured Output (schema RegraOverride) para retornar as regras estruturadas.
@@ -39,6 +39,8 @@ def extrair_regras_override(texto_documento: str, logger=None) -> Optional[Dict]
         return None
         
     from gemini_retry import executar_chamada_com_retry
+    from telemetry import resolver_modelo
+    modelo_alvo = resolver_modelo("extrator", modelo_llm)
 
     try:
         client = get_genai_client()
@@ -51,7 +53,7 @@ def extrair_regras_override(texto_documento: str, logger=None) -> Optional[Dict]
             
         def chamar_extrator():
             return client.models.generate_content(
-                model="gemini-3.5-flash-lite",
+                model=modelo_alvo,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -64,7 +66,9 @@ def extrair_regras_override(texto_documento: str, logger=None) -> Optional[Dict]
             max_retries=5,
             logger=logger,
             nome_agente="Extrator",
-            descricao="extração de notações e diretrizes"
+            descricao="extração de notações e diretrizes",
+            tracker=tracker,
+            modelo=modelo_alvo
         )
         
         if resposta.text:

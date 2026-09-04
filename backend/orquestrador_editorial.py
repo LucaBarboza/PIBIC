@@ -40,10 +40,16 @@ def carregar_chave_api():
             print(f"[ALERTA] Erro ao tentar ler {path}: {e}")
     return False
 
-def lapidar_conteudo_global(payload_bruto: dict, logger=None):
+def lapidar_conteudo_global(payload_bruto: dict, logger=None, modelo_llm: str = "hibrido", tracker=None) -> dict:
+    """
+    O Orquestrador Editorial recebe todas as seções e compila em uma obra unificada.
+    """
     client = get_genai_client()
-
-    dados_entrada_str = json.dumps(payload_bruto, ensure_ascii=False)
+    
+    from telemetry import resolver_modelo
+    modelo_alvo = resolver_modelo("orquestrador", modelo_llm)
+    
+    dados_entrada_str = json.dumps(payload_bruto, ensure_ascii=False, indent=2)
 
     print("\n[Agente 3.5] Assumindo o controle editorial. Unificando e eliminando repetições da aula...")
 
@@ -64,7 +70,7 @@ def lapidar_conteudo_global(payload_bruto: dict, logger=None):
             
         def chamar_orquestrador():
             return client.models.generate_content(
-                model="gemini-3.5-flash-lite",
+                model=modelo_alvo,
                 contents=[dados_entrada_str, prompt_editorial],
                 config=config_editorial
             )
@@ -74,7 +80,9 @@ def lapidar_conteudo_global(payload_bruto: dict, logger=None):
             max_retries=5,
             logger=logger,
             nome_agente="Orquestrador",
-            descricao="lapidação global da aula"
+            descricao="lapidação global da aula",
+            tracker=tracker,
+            modelo=modelo_alvo
         )
         
         if logger:

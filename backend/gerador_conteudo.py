@@ -19,7 +19,7 @@ import latex_sanitizer
 # ==============================================================================
 # FUNÇÃO PRINCIPAL DE ORQUESTRAÇÃO DE CONTEÚDO
 # ==============================================================================
-def gerar_conteudo_aula(nome_professor: str, codigo_disciplina: str, tema_solicitado: str, ementa_texto: str = None, diretrizes_texto: str = None, logger=None, modelo_llm: str = "2.5"):
+def gerar_conteudo_aula(nome_professor: str, codigo_disciplina: str, tema_solicitado: str, ementa_texto: str = None, diretrizes_texto: str = None, logger=None, modelo_llm: str = "hibrido", tracker=None):
     t_inicio_roteirista = 0.0
     t_fim_roteirista = 0.0
     t_inicio_escrita = 0.0
@@ -31,8 +31,9 @@ def gerar_conteudo_aula(nome_professor: str, codigo_disciplina: str, tema_solici
     
     try:
         client = get_genai_client()
-        modelo_roteirista = "gemini-3.5-flash-lite"
-        modelo_escritor = "gemini-pro-latest" if str(modelo_llm) == "pro" else "gemini-3.5-flash-lite"
+        from telemetry import resolver_modelo
+        modelo_roteirista = resolver_modelo("roteirista", modelo_llm)
+        modelo_escritor = resolver_modelo("escritor", modelo_llm)
 
     except Exception as e:
         if logger:
@@ -145,7 +146,9 @@ Cada item da lista deve focar intensamente em um único conceito específico, ga
             max_retries=5,
             logger=logger,
             nome_agente="Roteirista",
-            descricao="elaboração do macro roteiro da aula"
+            descricao="elaboração do macro roteiro da aula",
+            tracker=tracker,
+            modelo=modelo_roteirista
         )
         
         # O Pydantic realiza o parsing nativo garantindo o objeto tipado
@@ -317,7 +320,9 @@ Sua missão é APROVEITAR 100% da riqueza teórica do rascunho anterior e APLICA
                     max_retries=5,
                     logger=logger,
                     nome_agente=f"Escritor_{idx+1}",
-                    descricao=f"redação do subtópico {idx+1} (tentativa {tentativa})"
+                    descricao=f"redação do subtópico {idx+1} (tentativa {tentativa})",
+                    tracker=tracker,
+                    modelo=modelo_escritor
                 )
                 
                 if logger:
@@ -328,7 +333,7 @@ Sua missão é APROVEITAR 100% da riqueza teórica do rascunho anterior e APLICA
                 dados_escritor_dict = latex_sanitizer.sanitize_json_recursively(dados_escritor_dict)
                 
                 print(f"      [REVISOR] Analisando tópico {idx+1}...")
-                laudo_revisao = auditar_subtopico_local(dados_escritor_dict, diretrizes_texto, logger=logger, sub_idx=idx+1, sub_tentativa=tentativa)
+                laudo_revisao = auditar_subtopico_local(dados_escritor_dict, diretrizes_texto, logger=logger, sub_idx=idx+1, sub_tentativa=tentativa, modelo_llm=modelo_llm, tracker=tracker)
                 
                 if laudo_revisao.aprovado:
                     print(f"      [OK] Bloco {idx+1} APROVADO pelo revisor!")

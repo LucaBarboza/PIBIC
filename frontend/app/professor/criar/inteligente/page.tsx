@@ -192,22 +192,30 @@ export default function CriarSalaInteligente() {
                 {showGlobalAdvanced && (
                     <div className="p-6 border-t border-slate-200 space-y-6 bg-white">
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-2">Motor de Inteligência Artificial</label>
-                            <div className="flex gap-4">
-                                <label className={`flex-1 flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${modeloLlm === "2.5" ? "border-blue-600 bg-blue-50" : "border-slate-200 bg-white"}`}>
+                            <label className="block text-sm font-bold text-slate-700 mb-2">Motor de Inteligência Artificial & Modo de Custo</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-all ${modeloLlm === "2.5" ? "border-blue-600 bg-blue-50/70 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
                                     <input type="radio" name="llm_model" value="2.5" checked={modeloLlm === "2.5"} onChange={() => setModeloLlm("2.5")} className="hidden" />
-                                    <span className="text-2xl mr-3">🟢</span>
+                                    <span className="text-2xl mr-3">🧠</span>
                                     <div>
-                                        <div className="font-bold text-slate-800">Alta Precisão (Família 2.5)</div>
-                                        <div className="text-xs text-slate-500">Gemini 2.5 Pro. Maior capacidade de raciocínio lógico, custo maior e mais lento.</div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-bold text-slate-800 text-sm">Híbrido Otimizado</span>
+                                            <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">2.5 Pro + Flash</span>
+                                        </div>
+                                        <div className="text-xs text-slate-600 leading-relaxed mb-2">Gemini 2.5 Pro na escrita teórica densa e simulações complexas + Flash na validação.</div>
+                                        <div className="text-xs font-semibold text-blue-700">~R$ 0,25 a R$ 0,30 / aula</div>
                                     </div>
                                 </label>
-                                <label className={`flex-1 flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${modeloLlm === "3.5" ? "border-blue-600 bg-blue-50" : "border-slate-200 bg-white"}`}>
+                                <label className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-all ${modeloLlm === "3.5" ? "border-emerald-600 bg-emerald-50/70 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
                                     <input type="radio" name="llm_model" value="3.5" checked={modeloLlm === "3.5"} onChange={() => setModeloLlm("3.5")} className="hidden" />
                                     <span className="text-2xl mr-3">⚡</span>
                                     <div>
-                                        <div className="font-bold text-slate-800">Nova Geração (Família 3.5)</div>
-                                        <div className="text-xs text-slate-500">Gemini 3.5 Flash-Lite. Focado em velocidade e economia, ideal para conteúdos diretos.</div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-bold text-slate-800 text-sm">Ultra Econômico</span>
+                                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">100% 3.5 Flash-Lite</span>
+                                        </div>
+                                        <div className="text-xs text-slate-600 leading-relaxed mb-2">Todos os agentes rodam no Gemini 3.5 Flash-Lite. Focado em velocidade e custo mínimo.</div>
+                                        <div className="text-xs font-semibold text-emerald-700">~R$ 0,17 / aula</div>
                                     </div>
                                 </label>
                             </div>

@@ -138,18 +138,21 @@ class SimuladorHTMLOutput(BaseModel):
         description="Código HTML5 completo contendo <!DOCTYPE html>, Tailwind CSS, Plotly.js e Javascript interativo em uma única string sem blocos de markdown."
     )
 
-def gerar_simulador_html(tema_aula: str, nome_simulador: str, logger=None) -> str:
+def gerar_simulador_html(tema_aula: str, nome_simulador: str, logger=None, modelo_llm: str = "hibrido", tracker=None) -> str:
     """
-    Gera um código HTML/JS completo para uma simulação interativa usando Gemini Pro com Structured Outputs.
+    Gera um código HTML/JS completo para uma simulação interativa usando Gemini com Structured Outputs.
     """
     client = get_genai_client()
+    
+    from telemetry import resolver_modelo
+    modelo_alvo = resolver_modelo("simulador", modelo_llm)
     
     prompt = PROMPT_ENGENHEIRO_SIMULACAO.format(
         tema_aula=tema_aula,
         nome_simulador=nome_simulador
     )
     
-    print(f"\n[Agente Simulador] Gerando simulação interativa estruturada para '{nome_simulador}' com Gemini Pro...")
+    print(f"\n[Agente Simulador ({modelo_alvo})] Gerando simulação interativa estruturada para '{nome_simulador}'...")
     
     from gemini_retry import executar_chamada_com_retry
 
@@ -160,7 +163,7 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, logger=None) -> st
         
         def chamar_simulador():
             return client.models.generate_content(
-                model="gemini-3.5-flash-lite",
+                model=modelo_alvo,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -173,7 +176,9 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, logger=None) -> st
             max_retries=5,
             logger=logger,
             nome_agente="Simulador",
-            descricao=f"geração do simulador '{nome_simulador}'"
+            descricao=f"geração do simulador '{nome_simulador}'",
+            tracker=tracker,
+            modelo=modelo_alvo
         )
         
         simulador_obj = SimuladorHTMLOutput.model_validate_json(resposta.text)

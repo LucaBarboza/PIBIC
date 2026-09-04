@@ -21,7 +21,7 @@ class MacroRoteirista:
         self.client = get_genai_client()
         self.system_instruction = PROMPT_MACRO_ROTEIRISTA
 
-    def gerar_cronograma(self, ementa_texto: str, instrucoes_personalizadas: str = None, tipo_carga_horaria: str = "padrao_30", permitir_aprofundamento: bool = False, max_aulas: int = 30) -> list:
+    def gerar_cronograma(self, ementa_texto: str, instrucoes_personalizadas: str = None, tipo_carga_horaria: str = "padrao_30", permitir_aprofundamento: bool = False, max_aulas: int = 30, modelo_llm: str = "hibrido", tracker = None) -> list:
         
         instrucao_carga = ""
         if tipo_carga_horaria == "padrao_30" or tipo_carga_horaria == "manual":
@@ -52,14 +52,16 @@ DIRETRIZ DE CARGA HORÁRIA (MANDATÓRIO):
 DIRETRIZ DE APROFUNDAMENTO (MANDATÓRIO):
 {instrucao_aprofundamento}
 """
-        print(f"[MacroRoteirista] Pensando e fatiando a ementa via Structured Output. (Carga={tipo_carga_horaria}, Aprofundamento={permitir_aprofundamento})...")
+        from telemetry import resolver_modelo
+        modelo_alvo = resolver_modelo("macro_roteirista", modelo_llm)
+        print(f"[MacroRoteirista ({modelo_alvo})] Pensando e fatiando a ementa via Structured Output. (Carga={tipo_carga_horaria}, Aprofundamento={permitir_aprofundamento})...")
         
         try:
             from gemini_retry import executar_chamada_com_retry
 
             def chamar_macro():
                 return self.client.models.generate_content(
-                    model="gemini-3.5-flash-lite",
+                    model=modelo_alvo,
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=self.system_instruction,
@@ -72,7 +74,9 @@ DIRETRIZ DE APROFUNDAMENTO (MANDATÓRIO):
                 chamar_macro,
                 max_retries=5,
                 nome_agente="MacroRoteirista",
-                descricao="fatiamento da ementa em cronograma"
+                descricao="fatiamento da ementa em cronograma",
+                tracker=tracker,
+                modelo=modelo_alvo
             )
             cronograma = CronogramaCompleto.model_validate_json(response.text)
             return [aula.model_dump() for aula in cronograma.aulas]

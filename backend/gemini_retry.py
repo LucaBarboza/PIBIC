@@ -6,7 +6,9 @@ def executar_chamada_com_retry(
     max_retries: int = 5,
     logger = None,
     nome_agente: str = "Agente",
-    descricao: str = "requisição"
+    descricao: str = "requisição",
+    tracker = None,
+    modelo: str = ""
 ):
     """
     Executa uma função de chamada ao Gemini/Vertex com política robusta de retentativas e progressive backoff.
@@ -15,7 +17,22 @@ def executar_chamada_com_retry(
     """
     for tentativa in range(max_retries):
         try:
-            return chamada_fn()
+            t0 = time.time()
+            res = chamada_fn()
+            t_elapsed = time.time() - t0
+            
+            if tracker and modelo:
+                try:
+                    tracker.registrar_chamada(
+                        nome_agente=nome_agente,
+                        modelo=modelo,
+                        response=res,
+                        tempo_s=t_elapsed
+                    )
+                except Exception as e_track:
+                    print(f" [AVISO TRACKER] Falha ao registrar telemetria: {e_track}")
+                    
+            return res
         except Exception as e:
             erro_str = str(e)
             is_429 = "429" in erro_str or "RESOURCE_EXHAUSTED" in erro_str or "quota" in erro_str.lower()

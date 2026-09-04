@@ -503,22 +503,28 @@ export default function ProfessorSemesterViewer() {
 
                 {/* Motor IA */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-800 mb-1">Motor de Inteligência Artificial</label>
-                  <div className="flex gap-2">
-                    <label className={`flex-1 flex items-center p-3 rounded-lg border cursor-pointer transition-all ${novaAulaModeloLlm === "2.5" ? "border-indigo-600 bg-indigo-50" : "border-slate-300 bg-white"}`}>
+                  <label className="block text-sm font-bold text-slate-800 mb-1">Motor de IA & Modo de Custo</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className={`flex items-start p-3 rounded-xl border-2 cursor-pointer transition-all ${novaAulaModeloLlm === "2.5" ? "border-indigo-600 bg-indigo-50/70 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
                       <input type="radio" name="avulsa_llm" value="2.5" checked={novaAulaModeloLlm === "2.5"} onChange={() => setNovaAulaModeloLlm("2.5")} className="hidden" />
-                      <span className="text-lg mr-2">🟢</span>
+                      <span className="text-xl mr-2">🧠</span>
                       <div>
-                        <div className="font-bold text-slate-800 text-sm">Alta Precisão</div>
-                        <div className="text-[10px] text-slate-500 leading-tight">Família 2.5 (Pro). Melhor raciocínio.</div>
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <span className="font-bold text-slate-800 text-xs">Híbrido Otimizado</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 leading-tight mb-1">Gemini 2.5 Pro (Escrita/Simulador) + Flash (Apoio).</div>
+                        <div className="text-[11px] font-bold text-indigo-700">~R$ 0,25 a R$ 0,30</div>
                       </div>
                     </label>
-                    <label className={`flex-1 flex items-center p-3 rounded-lg border cursor-pointer transition-all ${novaAulaModeloLlm === "3.5" ? "border-indigo-600 bg-indigo-50" : "border-slate-300 bg-white"}`}>
+                    <label className={`flex items-start p-3 rounded-xl border-2 cursor-pointer transition-all ${novaAulaModeloLlm === "3.5" ? "border-emerald-600 bg-emerald-50/70 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
                       <input type="radio" name="avulsa_llm" value="3.5" checked={novaAulaModeloLlm === "3.5"} onChange={() => setNovaAulaModeloLlm("3.5")} className="hidden" />
-                      <span className="text-lg mr-2">⚡</span>
+                      <span className="text-xl mr-2">⚡</span>
                       <div>
-                        <div className="font-bold text-slate-800 text-sm">Nova Geração</div>
-                        <div className="text-[10px] text-slate-500 leading-tight">Família 3.5 (Flash). Econômico e Rápido.</div>
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <span className="font-bold text-slate-800 text-xs">Ultra Econômico</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 leading-tight mb-1">100% Gemini 3.5 Flash-Lite. Máxima velocidade.</div>
+                        <div className="text-[11px] font-bold text-emerald-700">~R$ 0,17 / aula</div>
                       </div>
                     </label>
                   </div>
@@ -909,21 +915,117 @@ export default function ProfessorSemesterViewer() {
 
               {/* ABA REFERÊNCIAS */}
               <div className={activeTab === 'referencias' ? 'block' : 'hidden'}>
+                {selectedAula.conteudo_json?.referencias_bibliograficas_finais?.length > 0 && (
+                  <section className="bg-slate-800 text-slate-300 p-8 rounded-2xl mt-12">
+                    <h3 className="text-xl font-bold text-white mb-6">📚 Referências da Aula</h3>
+                    <ul className="space-y-3">
+                      {selectedAula.conteudo_json.referencias_bibliograficas_finais.map((ref: string, rIdx: number) => (
+                        <li key={rIdx} className="flex gap-3">
+                          <span className="text-blue-400">•</span>
+                          <span>{ref}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </div> {/* Fim Aba Referências */}
 
-              {selectedAula.conteudo_json?.referencias_bibliograficas_finais?.length > 0 && (
-                <section className="bg-slate-800 text-slate-300 p-8 rounded-2xl mt-12">
-                  <h3 className="text-xl font-bold text-white mb-6">📚 Referências da Aula</h3>
-                  <ul className="space-y-3">
-                    {selectedAula.conteudo_json.referencias_bibliograficas_finais.map((ref: string, rIdx: number) => (
-                      <li key={rIdx} className="flex gap-3">
-                        <span className="text-blue-400">•</span>
-                        <span>{ref}</span>
-                      </li>
-                    ))}
-                  </ul>
+              {/* CARD DE TELEMETRIA & CONTADOR DE GASTOS */}
+              {selectedAula.conteudo_json?.telemetria_custo && (
+                <section className="mt-12 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-700/80">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-slate-700">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xl">📊</span>
+                        <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                          Telemetria & Contador de Gastos da Aula
+                        </h3>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-400">
+                        Consumo real de tokens auditado via API do Google Gemini AI
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs bg-indigo-500/20 text-indigo-300 px-3 py-1.5 rounded-full border border-indigo-500/30 font-semibold">
+                        {selectedAula.conteudo_json.telemetria_custo.modo_label || "Modo IA"}
+                      </span>
+                      <div className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-4 py-1.5 rounded-xl text-center">
+                        <div className="text-[10px] uppercase font-bold text-emerald-400">Custo Total</div>
+                        <div className="text-lg font-black text-emerald-300">
+                          {selectedAula.conteudo_json.telemetria_custo.custo_formatado_brl || `R$ ${selectedAula.conteudo_json.telemetria_custo.custo_total_brl?.toFixed(3)}`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Grid de Métricas Chave */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-6">
+                    <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60">
+                      <span className="text-slate-400 text-xs block mb-1">Total de Tokens</span>
+                      <span className="text-xl sm:text-2xl font-black text-white">
+                        {selectedAula.conteudo_json.telemetria_custo.tokens_total?.toLocaleString("pt-BR") || 0}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">tokens processados</span>
+                    </div>
+                    <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60">
+                      <span className="text-slate-400 text-xs block mb-1">Tokens de Entrada</span>
+                      <span className="text-xl sm:text-2xl font-bold text-blue-400">
+                        {selectedAula.conteudo_json.telemetria_custo.tokens_prompt?.toLocaleString("pt-BR") || 0}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">prompts & ementa</span>
+                    </div>
+                    <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60">
+                      <span className="text-slate-400 text-xs block mb-1">Tokens de Saída</span>
+                      <span className="text-xl sm:text-2xl font-bold text-purple-400">
+                        {selectedAula.conteudo_json.telemetria_custo.tokens_resposta?.toLocaleString("pt-BR") || 0}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">conteúdo & código JS</span>
+                    </div>
+                    <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60">
+                      <span className="text-slate-400 text-xs block mb-1">Custo em Dólar</span>
+                      <span className="text-xl sm:text-2xl font-bold text-emerald-400">
+                        {selectedAula.conteudo_json.telemetria_custo.custo_formatado_usd || `$${selectedAula.conteudo_json.telemetria_custo.custo_total_usd?.toFixed(4)}`}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">USD (câmbio ~R$ 5,50)</span>
+                    </div>
+                  </div>
+
+                  {/* Tabela de Consumo por Agente */}
+                  {selectedAula.conteudo_json.telemetria_custo.detalhe_agentes?.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-slate-700/80">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                        <span>🤖</span> Detalhamento do Consumo por Agente
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-700 text-slate-400">
+                              <th className="pb-2 font-semibold">Agente</th>
+                              <th className="pb-2 font-semibold">Modelo</th>
+                              <th className="pb-2 font-semibold text-right">Prompt</th>
+                              <th className="pb-2 font-semibold text-right">Resposta</th>
+                              <th className="pb-2 font-semibold text-right">Tempo</th>
+                              <th className="pb-2 font-semibold text-right">Custo Estimado</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800">
+                            {selectedAula.conteudo_json.telemetria_custo.detalhe_agentes.map((item: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-slate-800/40 transition">
+                                <td className="py-2.5 font-bold text-slate-200">{item.agente}</td>
+                                <td className="py-2.5 text-indigo-300 font-mono text-[11px]">{item.nome_modelo || item.modelo}</td>
+                                <td className="py-2.5 text-right text-slate-300">{item.tokens_prompt?.toLocaleString("pt-BR")}</td>
+                                <td className="py-2.5 text-right text-slate-300">{item.tokens_resposta?.toLocaleString("pt-BR")}</td>
+                                <td className="py-2.5 text-right text-slate-400">{item.tempo_segundos}s</td>
+                                <td className="py-2.5 text-right font-bold text-emerald-400">R$ {item.custo_brl?.toFixed(4)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </section>
               )}
-              </div> {/* Fim Aba Referências */}
             </div>
           )}
         </main>
