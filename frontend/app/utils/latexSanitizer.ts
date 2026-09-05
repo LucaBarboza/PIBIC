@@ -3,6 +3,76 @@
  * Enforces 100% valid KaTeX / ReactMarkdown parsing across titles, boxes, and prose.
  */
 
+function splitChainedDisplayMath(content: string): string {
+  if (content.includes('\\begin{')) {
+    return content;
+  }
+
+  const chunks: string[] = [];
+  let currentChunk: string[] = [];
+  let depth = 0;
+  const n = content.length;
+  let i = 0;
+
+  while (i < n) {
+    const char = content[i];
+    if (char === '{' || char === '[') {
+      depth++;
+      currentChunk.push(char);
+      i++;
+    } else if (char === '}' || char === ']') {
+      depth = Math.max(0, depth - 1);
+      currentChunk.push(char);
+      i++;
+    } else if (char === '=' && depth === 0) {
+      const prevStr = currentChunk.join('').trimEnd();
+      if (
+        prevStr.endsWith('\\le') ||
+        prevStr.endsWith('\\ge') ||
+        prevStr.endsWith('\\ne') ||
+        prevStr.endsWith('\\leq') ||
+        prevStr.endsWith('\\geq') ||
+        prevStr.endsWith('\\approx') ||
+        prevStr.endsWith('\\equiv') ||
+        prevStr.endsWith('!') ||
+        prevStr.endsWith('<') ||
+        prevStr.endsWith('>') ||
+        prevStr.endsWith(':') ||
+        prevStr.endsWith('~')
+      ) {
+        currentChunk.push(char);
+        i++;
+      } else if (i + 1 < n && content[i + 1] === '=') {
+        currentChunk.push('==');
+        i += 2;
+      } else {
+        chunks.push(currentChunk.join('').trim());
+        currentChunk = [];
+        i++;
+      }
+    } else {
+      currentChunk.push(char);
+      i++;
+    }
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.join('').trim());
+  }
+
+  if (chunks.length >= 3 && content.length > 35) {
+    const first = chunks[0];
+    const rest = chunks.slice(1);
+    const alignedLines = [`${first} &= ${rest[0]}`];
+    for (let idx = 1; idx < rest.length; idx++) {
+      alignedLines.push(`&= ${rest[idx]}`);
+    }
+    return `\\begin{aligned}\n${alignedLines.join(' \\\\\n')}\n\\end{aligned}`;
+  }
+
+  return content;
+}
+
 function sanitizeDisplayMath(content: string): string {
   let c = content.trim();
   // 1. Converte ambientes incompatíveis com o rehype-katex
@@ -36,6 +106,9 @@ function sanitizeDisplayMath(content: string): string {
   if (!c.includes('\\begin{') && c.includes('\\\\')) {
     c = `\\begin{aligned}\n${c}\n\\end{aligned}`;
   }
+
+  // 8. Converte equações encadeadas longas (A = B = C = D) em \begin{aligned} multilinhas
+  c = splitChainedDisplayMath(c);
 
   return c.trim();
 }
@@ -90,7 +163,12 @@ export function sanitizeLatex(text: string): string {
     } else if (part.startsWith('$') && part.endsWith('$') && part.length >= 2 && !part.includes('\n')) {
       const inner = part.slice(1, -1);
       const sanitizedInner = sanitizeInlineMath(inner);
-      resultParts.push(`$${sanitizedInner}$`);
+      const chained = splitChainedDisplayMath(sanitizedInner);
+      if (chained.includes('\\begin{aligned}')) {
+        resultParts.push(`\n$$\n${chained}\n$$\n`);
+      } else {
+        resultParts.push(`$${sanitizedInner}$`);
+      }
     } else {
       // Prosa comum (fora de cifrões)
       let prose = part;

@@ -1,5 +1,69 @@
 import re
 
+def split_chained_display_math(content: str) -> str:
+    """
+    Se uma equação contiver 2 ou mais sinais de igualdade no nível raiz (fora de chaves)
+    e não estiver em nenhum ambiente \\begin{...}, converte automaticamente para:
+    \\begin{aligned}
+    termo1 &= termo2 \\\\
+    &= termo3 \\\\
+    &= termo4
+    \\end{aligned}
+    """
+    if r'\begin{' in content:
+        return content
+    
+    # Verifica se há múltiplos '=' fora de chaves {...} e colchetes [...]
+    chunks = []
+    current_chunk = []
+    depth = 0
+    i = 0
+    n = len(content)
+    
+    while i < n:
+        char = content[i]
+        
+        # Gerenciamento de profundidade de delimitadores
+        if char in '{[':
+            depth += 1
+            current_chunk.append(char)
+            i += 1
+        elif char in '}]':
+            depth = max(0, depth - 1)
+            current_chunk.append(char)
+            i += 1
+        elif char == '=' and depth == 0:
+            # Verifica se não é <=, >=, !=, ==, \le, \ge, \ne, etc.
+            prev_str = "".join(current_chunk).rstrip()
+            if prev_str.endswith(('\\le', '\\ge', '\\ne', '\\leq', '\\geq', '\\approx', '\\equiv', '!', '<', '>', ':', '~')):
+                current_chunk.append(char)
+                i += 1
+            elif i + 1 < n and content[i+1] == '=': # ==
+                current_chunk.append('==')
+                i += 2
+            else:
+                # É um sinal de igualdade top-level válido
+                chunks.append("".join(current_chunk).strip())
+                current_chunk = []
+                i += 1
+        else:
+            current_chunk.append(char)
+            i += 1
+            
+    if current_chunk:
+        chunks.append("".join(current_chunk).strip())
+        
+    # Se temos 3 ou mais partes (pelo menos 2 '=' encadeados) e tamanho razoável (>35 chars)
+    if len(chunks) >= 3 and len(content) > 35:
+        first = chunks[0]
+        rest = chunks[1:]
+        aligned_lines = [f"{first} &= {rest[0]}"]
+        for item in rest[1:]:
+            aligned_lines.append(f"&= {item}")
+        return "\\begin{aligned}\n" + " \\\\\n".join(aligned_lines) + "\n\\end{aligned}"
+        
+    return content
+
 def sanitize_display_math(content: str) -> str:
     """Sanitiza o conteúdo interno de um bloco de Display Math ($$...$$)."""
     c = content.strip()
@@ -40,6 +104,9 @@ def sanitize_display_math(content: str) -> str:
         c_lines = [l.strip() for l in re.split(r'\\qquad|\\quad', c) if l.strip()]
         if len(c_lines) > 1:
             c = "\\begin{aligned}\n" + " \\\\\n".join(c_lines) + "\n\\end{aligned}"
+    
+    # 9. Converte equações encadeadas longas (A = B = C = D) em \begin{aligned} multilinhas
+    c = split_chained_display_math(c)
     
     return c.strip()
 
@@ -104,7 +171,11 @@ def sanitize_latex_string(text: str) -> str:
         elif part.startswith('$') and part.endswith('$') and len(part) >= 2 and '\n' not in part:
             inner = part[1:-1]
             sanitized_inner = sanitize_inline_math(inner)
-            result_parts.append(f"${sanitized_inner}$")
+            chained = split_chained_display_math(sanitized_inner)
+            if r'\begin{aligned}' in chained:
+                result_parts.append(f"\n$$\n{chained}\n$$\n")
+            else:
+                result_parts.append(f"${sanitized_inner}$")
         else:
             # Prosa comum (fora de cifrões)
             prose = part
