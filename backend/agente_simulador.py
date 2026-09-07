@@ -21,21 +21,21 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
   <script src="https://cdn.plot.ly/plotly-2.29.1.min.js"></script>
   <!-- 3. KaTeX CSS + JS + Auto-Render via CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
   <style>
     body {
       background-color: #f8fafc;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
       padding: 0;
-      overflow: hidden;
+      overflow-x: hidden;
     }
     .katex { font-size: 1.05em; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased p-3 sm:p-5">
-  <div id="simulador-root" class="max-w-4xl mx-auto space-y-4">
+<body class="bg-slate-50 text-slate-800 antialiased p-3 sm:p-5 pb-8 sm:pb-12">
+  <div id="simulador-root" class="max-w-4xl mx-auto space-y-4 pb-4">
     <!-- Cabeçalho Acadêmico Pré-Pronto -->
     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
       <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">Lab Interativo</span>
@@ -62,79 +62,112 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
     __BLOCO_FORMULA_CARD__
 
     <!-- Card de Explicação Pedagógica Dinâmica -->
-    <div class="bg-indigo-50/60 border border-indigo-100 p-4 rounded-xl text-slate-700 shadow-sm">
-      <div class="flex items-center gap-2 mb-1.5">
+    <div class="bg-indigo-50/60 border border-indigo-100 p-4 sm:p-5 rounded-xl text-slate-700 shadow-sm">
+      <div class="flex items-center gap-2 mb-2">
         <span class="text-indigo-600 font-bold text-sm">💡 Interpretação Pedagógica:</span>
       </div>
-      <p id="explicacao_dinamica" class="text-sm leading-relaxed text-slate-700">
+      <div id="explicacao_dinamica" class="text-sm leading-relaxed text-slate-700 space-y-1.5">
         __EXPLICACAO_INICIAL__
-      </p>
+      </div>
     </div>
   </div>
 
   <!-- Sistema de Auto-Ajuste de Altura e Renderização KaTeX -->
   <script>
-    function limparCaracteresDeEscapeJS(rootEl) {
-      if (!rootEl) return;
-      const elements = rootEl.querySelectorAll('*');
-      elements.forEach(el => {
-        if (el.children.length === 0 && el.innerHTML) {
-          let txt = el.innerHTML;
-          if (txt.includes('\\x0c') || txt.includes('\\x08') || txt.includes('rac{') || txt.includes('quad') || txt.includes('omega_') || txt.includes('hat') || txt.includes('ell(')) {
-            txt = txt
-              .replace(/[\\x0c\\u000c]rac/g, '\\\\frac')
-              .replace(/[\\x08\\u0008]ar\\{/g, '\\\\bar{')
-              .replace(/[\\x08\\u0008]eta/g, '\\\\beta')
-              .replace(/[\\x08\\u0008]inom/g, '\\\\binom')
-              .replace(/[\\x08\\u0008]mathbf/g, '\\\\mathbf')
-              .replace(/(?<![\\\\f\\x0c\\u000c])rac\\{/g, '\\\\frac{')
-              .replace(/(?<![\\\\a-zA-Z])hat(?=\s*[\(\{\\\\a-zA-Z])/g, '\\\\hat ')
-              .replace(/(?<![\\\\a-zA-Z])ell(?=[\s\(\{\^_])/g, '\\\\ell ')
-              .replace(/(?<!\\\\)omega([_\\s\\^\\{])/g, '\\\\omega$1')
-              .replace(/(?<!\\\\)sigma([_\\s\\^\\{])/g, '\\\\sigma$1')
-              .replace(/(?<!\\\\)mu([_\\s\\^\\{])/g, '\\\\mu$1')
-              .replace(/(?<!\\\\)alpha([_\\s\\^\\{])/g, '\\\\alpha$1')
-              .replace(/(?<!\\\\)beta([_\\s\\^\\{])/g, '\\\\beta$1')
-              .replace(/(?<!\\\\)theta([_\\s\\^\\{])/g, '\\\\theta$1')
-              .replace(/(?<!\\\\)lambda([_\\s\\^\\{])/g, '\\\\lambda$1')
-              .replace(/(?<!\\\\)pi([_\\s\\^\\{])/g, '\\\\pi$1')
-              .replace(/(?<!\\\\)sum([_\\s\\^\\{])/g, '\\\\sum$1')
-              .replace(/(?<!\\\\)quad(?=[\\s\\$\\(\\)])/g, '\\\\quad');
-            el.innerHTML = txt;
+    function prepararLatexSolto(texto) {
+      if (!texto || typeof texto !== 'string') return texto;
+      if (texto.includes('katex-html') || texto.includes('katex-display')) return texto;
+
+      let res = texto;
+      
+      // 1. Recupera escapes de caracteres de controle e tabs corrompidos
+      res = res
+        .replace(/[\\x0c\\u000c]rac/g, '\\\\frac')
+        .replace(/[\\x08\\u0008]ar\\{/g, '\\\\bar{')
+        .replace(/[\\x08\\u0008]eta/g, '\\\\beta')
+        .replace(/[\\x08\\u0008]inom/g, '\\\\binom')
+        .replace(/[\\x08\\u0008]mathbf/g, '\\\\mathbf')
+        .replace(/\\t(ext|au|heta|imes)/g, '\\\\$1')
+        .replace(/(?<![\\\\f\\x0c\\u000c])rac\\{/g, '\\\\frac{');
+
+      // 2. Parênteses contendo expressões matemáticas como (\\mu), (\\sigma = 1.0), (\\mu \\pm 1\\sigma), (k \\cdot \\sigma)
+      res = res.replace(/\\(([^)]*\\\\(?:mu|sigma|alpha|beta|theta|lambda|pi|gamma|delta|phi|omega|tau|rho|hat|bar|pm|approx|leq|geq|cdot)[^)]*)\\)/g, function(match, interior) {
+        var limpo = interior.trim();
+        if (limpo.startsWith('$') && limpo.endsWith('$')) return match;
+        return '($' + limpo + '$)';
+      });
+
+      // 3. Comandos LaTeX soltos restantes (que não estão em $...$)
+      var cmdRegex = /(?<![\\$\\a-zA-Z0-9])\\\\(mu|sigma|alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|iota|kappa|lambda|nu|xi|pi|varpi|rho|varrho|varsigma|tau|upsilon|phi|varphi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega|pm|mp|cdot|times|approx|neq|ne|leq|geq|le|ge|infty|forall|exists|partial|nabla)(?![a-zA-Z0-9])/g;
+
+      var partes = res.split(/(\\$\\$[\\s\\S]*?\\$\\$|\\$[^\\$\\n]+?\\$)/);
+      for (var i = 0; i < partes.length; i += 2) {
+        if (partes[i]) {
+          partes[i] = partes[i].replace(cmdRegex, function(_, m) { return '$\\\\' + m + '$'; });
+        }
+      }
+      return partes.join('');
+    }
+
+    function processarNosDeTextoParaLatex(node) {
+      if (!node) return;
+      if (node.nodeType === Node.TEXT_NODE) {
+        const val = node.nodeValue;
+        if (val && (val.includes('\\\\') || val.includes('\\t') || val.includes('\\x0c') || val.includes('\\x08'))) {
+          const modificado = prepararLatexSolto(val);
+          if (modificado !== val) {
+            node.nodeValue = modificado;
           }
         }
-      });
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const tag = node.tagName.toLowerCase();
+        if (tag === 'script' || tag === 'style' || tag === 'input' || tag === 'select' || (node.classList && (node.classList.contains('katex') || node.classList.contains('katex-html')))) {
+          return;
+        }
+        Array.from(node.childNodes).forEach(child => processarNosDeTextoParaLatex(child));
+      }
     }
 
     let lastSentHeight = 0;
     function emitirAltura() {
       const root = document.getElementById('simulador-root');
       if (!root) return;
-      // Mede ESTRITAMENTE o elemento de conteúdo, sem consultar body/doc scrollHeight (evita loop infinito)
-      const h = Math.ceil(root.offsetHeight || root.getBoundingClientRect().height);
-      if (h > 50 && Math.abs(h - lastSentHeight) > 6) {
-        lastSentHeight = h;
-        const alturaFinal = Math.min(h + 24, 1800);
+      const rect = root.getBoundingClientRect();
+      const h = Math.ceil(Math.max(root.offsetHeight, rect.height, root.scrollHeight));
+      const alturaFinal = Math.min(h + 60, 2400);
+      if (alturaFinal > 80 && Math.abs(alturaFinal - lastSentHeight) >= 4) {
+        lastSentHeight = alturaFinal;
         window.parent.postMessage({ type: 'simulador_resize', height: alturaFinal }, '*');
       }
     }
 
+    let renderizando = false;
     function renderizarLatex() {
-      const rootEl = document.getElementById('simulador-root') || document.body;
-      limparCaracteresDeEscapeJS(rootEl);
-      if (window.renderMathInElement) {
-        renderMathInElement(document.body, {
-          delimiters: [
-            {left: '$$', right: '$$', display: true},
-            {left: '$', right: '$', display: false}
-          ],
-          throwOnError: false
-        });
+      if (renderizando) return;
+      renderizando = true;
+      try {
+        const rootEl = document.getElementById('simulador-root') || document.body;
+        processarNosDeTextoParaLatex(rootEl);
+        if (window.renderMathInElement) {
+          renderMathInElement(rootEl, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '$', right: '$', display: false},
+              {left: '\\(', right: '\\)', display: false},
+              {left: '\\[', right: '\\]', display: true}
+            ],
+            throwOnError: false
+          });
+        }
+      } catch (err) {
+        console.warn('Erro na renderização KaTeX:', err);
+      } finally {
+        renderizando = false;
+        setTimeout(emitirAltura, 40);
       }
-      setTimeout(emitirAltura, 50);
     }
 
-    // Observador contínuo focado exclusivamente no container de conteúdo
+    // Observador contínuo de resize no container
     if (window.ResizeObserver) {
       const ro = new ResizeObserver(() => {
         emitirAltura();
@@ -143,10 +176,33 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       if (rootEl) ro.observe(rootEl);
     }
 
-    // Carregamento inicial garantido
-    window.addEventListener('load', () => {
+    // Observador de mutações no DOM para detectar updates em explicacao_dinamica e controles
+    window.addEventListener('DOMContentLoaded', () => {
+      const rootEl = document.getElementById('simulador-root');
+      if (rootEl && window.MutationObserver) {
+        let timerMutacao = null;
+        const mo = new MutationObserver((mutations) => {
+          const apenasKatex = mutations.every(m => {
+            const t = m.target;
+            return t && t.classList && (t.classList.contains('katex') || t.classList.contains('katex-html'));
+          });
+          if (apenasKatex) return;
+
+          if (timerMutacao) clearTimeout(timerMutacao);
+          timerMutacao = setTimeout(() => {
+            renderizarLatex();
+          }, 30);
+        });
+        mo.observe(rootEl, { childList: true, characterData: true, subtree: true });
+      }
       renderizarLatex();
       emitirAltura();
+    });
+
+    window.addEventListener('load', () => {
+      renderizarLatex();
+      setTimeout(emitirAltura, 100);
+      setTimeout(emitirAltura, 400);
     });
   </script>
 
@@ -191,10 +247,10 @@ Conteúdo Teórico do Subtópico:
    - É TERMINANTEMENTE PROIBIDO criar sliders ou controles genéricos/artificiais (como 'Fator Multiplicativo', 'Deslocamento Base', 'Colunas', 'Barras').
    - Todos os controles devem modelar parâmetros estatísticos REAIS com rótulos em português:
      * Para Gráficos de Frequência / Barras / Setores: Categorias reais (ex: 'Regiões', 'Cursos', 'Faixas de Renda'), controle de contagem/frequência de cada categoria, alternância entre 'Frequência Absoluta' e 'Frequência Relativa (%)', ordenação (Decrescente / Crescente / Original).
-     * Para Histogramas: 'Número de Intervalos (bins)', 'Tamanho da Amostra (n)', 'Média (mu)', 'Desvio Padrão (sigma)'.
-     * Para Boxplots / Medidas de Posição: 'Mediana', 'Dispersão (IQR)', 'Assimetria', inclusão de 'Outliers'.
-     * Para Dispersão e Regressão: 'Inclinação (beta1)', 'Intercepto (beta0)', 'Dispersão dos Erros (sigma)', 'Tamanho da Amostra (n)'.
-     * Para Distribuições de Probabilidade: Parâmetros reais da distribuição (ex: p, n, mu, sigma, lambda, gl).
+     * Para Histogramas: 'Número de Intervalos (bins)', 'Tamanho da Amostra ($n$)', 'Média ($\\mu$)', 'Desvio Padrão ($\\sigma$)'.
+     * Para Boxplots / Medidas de Posição: 'Mediana', 'Dispersão ($IQR$)', 'Assimetria', inclusão de 'Outliers'.
+     * Para Dispersão e Regressão: 'Inclinação ($\\beta_1$)', 'Intercepto ($\\beta_0$)', 'Dispersão dos Erros ($\\sigma$)', 'Tamanho da Amostra ($n$)'.
+     * Para Distribuições de Probabilidade: Parâmetros reais da distribuição (ex: $p$, $n$, $\\mu$, $\\sigma$, $\\lambda$, $gl$).
 
 2. EIXOS FIXOS E ESTÁVEIS NO PLOTLY:
    - No `layout` do Plotly, use SEMPRE `autorange: false` e limites `range: [min, max]` fixos bem calibrados nos eixos.
@@ -204,7 +260,7 @@ Conteúdo Teórico do Subtópico:
 
 3. ESTRUTURA DO HTML DOS CONTROLES (`painel_controles_html`):
    - Gere apenas os blocos de `<div class="space-y-1">` contendo:
-     `<label class="flex justify-between text-xs font-semibold text-slate-700"><span>Nome do Parâmetro:</span><span id="valor_param" class="text-indigo-600 font-bold">50</span></label>`
+     `<label class="flex justify-between text-xs font-semibold text-slate-700"><span>Nome do Parâmetro ($...$):</span><span id="valor_param" class="text-indigo-600 font-bold">50</span></label>`
      `<input type="range" id="param" min="..." max="..." step="..." value="..." class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">`
    - Se aplicável, use `<select id="..." class="w-full text-xs font-medium bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-700 focus:ring-indigo-500 focus:border-indigo-500">`.
 
@@ -214,8 +270,12 @@ Conteúdo Teórico do Subtópico:
      a) Lê os valores dos inputs.
      b) Atualiza os `<span>` com os valores formatados.
      c) Gera os dados estatísticos e atualiza o gráfico via `Plotly.react('grafico', traces, layout, {{ responsive: true, displayModeBar: false }})`.
-     d) Atualiza o elemento `document.getElementById('explicacao_dinamica').innerHTML` com uma explicação pedagógica dinâmica em português que interpreta o resultado atual para o estudante.
-     e) Chama `renderizarLatex()` caso haja fórmulas matemáticas no texto dinâmico.
+     d) Atualiza o elemento `document.getElementById('explicacao_dinamica').innerHTML` com uma explicação pedagógica dinâmica em português estruturada (usando listas `•` ou parágrafos) que interpreta o resultado atual para o estudante.
+     e) Chama `renderizarLatex()` no final para formatar símbolos KaTeX.
+
+5. FORMATAÇÃO DE SÍMBOLOS MATEMÁTICOS E LATEX:
+   - Envolva sempre letras gregas e fórmulas matemáticas entre cifrões `$ ... $` (ex: `($\\mu = 0.0$)`, `($\\sigma = 1.0$)`, `($\\mu \\pm 1\\sigma$)`, `$f(x)$`).
+   - Não use quebras literais de texto sem tags HTML (`<br>` ou `<p>`).
 
 Retorne estritamente o JSON estruturado conforme o schema.
 """
@@ -254,7 +314,7 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, contexto_subtopico
         contexto_subtopico=contexto_subtopico or "Conceitos teóricos e visuais da aula."
     )
     
-    print(f"\n[Agente Simulador ({modelo_alvo})] Projetando componentes estruturados para '{nome_simulador}'...")
+    print(f"\\n[Agente Simulador ({modelo_alvo})] Projetando componentes estruturados para '{nome_simulador}'...")
     
     try:
         if logger:
@@ -317,7 +377,10 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, contexto_subtopico
                 r'ell|hbar|aleph|Re|Im|wp|'
                 r'quad|qquad|left|right|big|Big|bigg|Bigg|middle'
             )
-            # Garante que qualquer comando LaTeX em strings JS tenha barras duplas '\\'
+            # 1. Recupera caracteres de controle gerados por escape no JSON
+            codigo_js = codigo_js.replace('\x0c', r'\f').replace('\x08', r'\b')
+            codigo_js = re.sub(r'\t(ext|au|heta|imes)', r'\\t\1', codigo_js)
+            # 2. Garante que qualquer comando LaTeX em strings JS tenha barras duplas '\\'
             return re.sub(rf'(?<!\\)\\({comandos})(?![a-zA-Z])', r'\\\\\1', codigo_js)
 
         codigo_js_sanitizado = sanitizar_js_latex(comp.codigo_javascript_logica.strip())

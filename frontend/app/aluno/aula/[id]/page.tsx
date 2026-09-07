@@ -30,7 +30,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data && (event.data.type === 'simulador_resize' || event.data.type === 'resize') && event.data.height) {
-        const h = Math.min(Math.max(Number(event.data.height), 450), 1800);
+        const h = Math.min(Math.max(Number(event.data.height), 450), 2400);
         setIframeHeight(h);
       }
     };
