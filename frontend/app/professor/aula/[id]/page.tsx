@@ -9,7 +9,7 @@ import remarkMath from 'remark-math';
 import remarkBreaks from 'remark-breaks';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { Menu, X, Play, RefreshCw, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
+import { Menu, X, Play, RefreshCw } from 'lucide-react';
 import AgentDebuggerModal from '@/components/AgentDebuggerModal';
 import { sanitizeLatex } from '@/app/utils/latexSanitizer';
 
@@ -17,9 +17,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   const [html, setHtml] = useState<string | null>(htmlCode || null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [iframeHeight, setIframeHeight] = useState(850);
-  const [autoHeight, setAutoHeight] = useState(850);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [iframeHeight, setIframeHeight] = useState(700);
 
   useEffect(() => {
     if (htmlCode) {
@@ -32,23 +30,14 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data && (event.data.type === 'resize' || event.data.type === 'simulador_resize') && event.data.height) {
-        const measured = Number(event.data.height);
-        if (measured > 300 && measured < 4000) {
-          const newHeight = Math.max(measured + 30, 750);
-          setAutoHeight(newHeight);
-          setIframeHeight(prev => (prev === 850 || Math.abs(prev - autoHeight) < 50 ? newHeight : prev));
-        }
+      if (event.data && (event.data.type === 'simulador_resize' || event.data.type === 'resize') && event.data.height) {
+        const h = Math.min(Math.max(Number(event.data.height), 450), 1800);
+        setIframeHeight(h);
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [autoHeight]);
-
-  const aumentarAltura = () => setIframeHeight(prev => Math.min(prev + 150, 3000));
-  const diminuirAltura = () => setIframeHeight(prev => Math.max(prev - 150, 450));
-  const resetarAltura = () => setIframeHeight(autoHeight);
-  const toggleFullscreen = () => setIsFullscreen(prev => !prev);
+  }, []);
 
   const carregarSimulador = async () => {
     setLoading(true);
@@ -78,8 +67,8 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
     return (
       <div className="my-8 bg-slate-50 border border-slate-200 rounded-xl p-12 text-center shadow-inner">
         <RefreshCw className="animate-spin text-indigo-500 mx-auto mb-4" size={32} />
-        <p className="text-slate-600 font-medium animate-pulse">Engenheiro de IA programando o simulador...</p>
-        <p className="text-slate-400 text-sm mt-2">Isso pode levar até 20 segundos (código sendo escrito do zero)</p>
+        <p className="text-slate-600 font-medium animate-pulse">Engenheiro de IA programando o simulador no padrão acadêmico...</p>
+        <p className="text-slate-400 text-sm mt-2">Isso pode levar até 20 segundos (código sendo gerado e validado)</p>
       </div>
     );
   }
@@ -94,63 +83,23 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   }
 
   return (
-    <div className={`my-8 border border-slate-200 rounded-xl overflow-hidden shadow-lg bg-white transition-all duration-300 ${isFullscreen ? 'fixed inset-0 z-50 rounded-none my-0 h-screen w-screen flex flex-col bg-slate-900/60 backdrop-blur-sm p-2 sm:p-4' : ''}`}>
-      <div className={`${isFullscreen ? 'bg-slate-900 rounded-t-xl' : 'bg-slate-800'} text-slate-100 px-4 py-2.5 flex justify-between items-center shadow`}>
-        <div className="font-bold text-xs sm:text-sm flex items-center gap-2 truncate pr-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"></span>
-          <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 shrink-0"></span>
-          <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0"></span>
-          <span className="ml-1 text-slate-200 truncate font-semibold">Lab Virtual: {nomeSimulador}</span>
-        </div>
-
-        {/* Controles de Altura e Tela Cheia */}
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 bg-slate-700/60 p-1 rounded-lg text-xs">
-          <button 
-            onClick={diminuirAltura}
-            title="Reduzir Altura da Caixa (-150px)"
-            className="px-2 py-1 bg-slate-800 hover:bg-slate-600 rounded text-slate-200 hover:text-white transition flex items-center gap-1 font-mono font-bold"
-          >
-            <span>−</span>
-            <span className="hidden md:inline text-[11px] font-sans font-normal">Altura</span>
-          </button>
-          <button 
-            onClick={aumentarAltura}
-            title="Aumentar Altura da Caixa (+150px)"
-            className="px-2 py-1 bg-slate-800 hover:bg-slate-600 rounded text-slate-200 hover:text-white transition flex items-center gap-1 font-mono font-bold"
-          >
-            <span>+</span>
-            <span className="hidden md:inline text-[11px] font-sans font-normal">Altura</span>
-          </button>
-          <button 
-            onClick={resetarAltura}
-            title="Resetar para Altura Automática"
-            className="px-2 py-1 bg-slate-800 hover:bg-slate-600 rounded text-slate-200 hover:text-white transition flex items-center gap-1 text-[11px]"
-          >
-            <RotateCcw size={12} />
-            <span className="hidden md:inline">Auto</span>
-          </button>
-          <div className="h-4 w-px bg-slate-600 mx-0.5"></div>
-          <button 
-            onClick={toggleFullscreen}
-            title={isFullscreen ? "Sair da Tela Cheia" : "Modo Tela Cheia"}
-            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-medium transition flex items-center gap-1 text-[11px]"
-          >
-            {isFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
-            <span className="hidden sm:inline">{isFullscreen ? "Fechar" : "Tela Cheia"}</span>
-          </button>
+    <div className="my-8 border border-slate-200 rounded-xl overflow-hidden shadow-lg bg-white">
+      <div className="bg-slate-800 text-slate-100 px-4 py-3 flex justify-between items-center">
+        <div className="font-bold text-sm flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-red-500"></span>
+          <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+          <span className="w-3 h-3 rounded-full bg-green-500"></span>
+          <span className="ml-2 text-slate-300">Lab Virtual: {nomeSimulador}</span>
         </div>
       </div>
-
-      <div className={isFullscreen ? "flex-1 bg-white rounded-b-xl overflow-hidden shadow-2xl relative" : "relative bg-white"}>
-        <iframe 
-          srcDoc={html!}
-          style={{ height: isFullscreen ? '100%' : `${iframeHeight}px`, minHeight: isFullscreen ? '100%' : '650px' }}
-          className="w-full h-full border-none bg-white transition-all duration-200"
-          sandbox="allow-scripts allow-same-origin"
-          scrolling="auto"
-          title="Simulador Interativo"
-        />
-      </div>
+      <iframe 
+        srcDoc={html!}
+        style={{ height: `${iframeHeight}px`, width: '100%', border: 'none', display: 'block', overflow: 'hidden' }}
+        className="w-full border-none bg-white transition-all duration-150"
+        sandbox="allow-scripts allow-same-origin"
+        scrolling="no"
+        title="Simulador Interativo"
+      />
     </div>
   );
 }
@@ -768,7 +717,7 @@ export default function ProfessorSemesterViewer() {
                             </h5>
                             <div className="bg-white p-3 sm:p-4 rounded-lg border border-slate-200 shadow-sm space-y-3">
                               {deducoes.map((passo: string, pIdx: number) => (
-                                <div key={pIdx} className="text-slate-600 text-xs sm:text-sm leading-relaxed break-words whitespace-normal max-w-full">
+                                <div key={pIdx} className="text-slate-700 text-xs sm:text-sm leading-relaxed break-words whitespace-normal pb-1 border-b border-slate-100 last:border-b-0 last:pb-0">
                                   <ReactMarkdown remarkPlugins={[remarkMath, remarkBreaks]} rehypePlugins={[[rehypeKatex, {strict: false}]]}>
                                     {processLatex(passo)}
                                   </ReactMarkdown>

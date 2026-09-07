@@ -1,69 +1,5 @@
 import re
 
-def split_chained_display_math(content: str) -> str:
-    """
-    Se uma equação contiver 2 ou mais sinais de igualdade no nível raiz (fora de chaves)
-    e não estiver em nenhum ambiente \\begin{...}, converte automaticamente para:
-    \\begin{aligned}
-    termo1 &= termo2 \\\\
-    &= termo3 \\\\
-    &= termo4
-    \\end{aligned}
-    """
-    if r'\begin{' in content:
-        return content
-    
-    # Verifica se há múltiplos '=' fora de chaves {...} e colchetes [...]
-    chunks = []
-    current_chunk = []
-    depth = 0
-    i = 0
-    n = len(content)
-    
-    while i < n:
-        char = content[i]
-        
-        # Gerenciamento de profundidade de delimitadores
-        if char in '{[':
-            depth += 1
-            current_chunk.append(char)
-            i += 1
-        elif char in '}]':
-            depth = max(0, depth - 1)
-            current_chunk.append(char)
-            i += 1
-        elif char == '=' and depth == 0:
-            # Verifica se não é <=, >=, !=, ==, \le, \ge, \ne, etc.
-            prev_str = "".join(current_chunk).rstrip()
-            if prev_str.endswith(('\\le', '\\ge', '\\ne', '\\leq', '\\geq', '\\approx', '\\equiv', '!', '<', '>', ':', '~')):
-                current_chunk.append(char)
-                i += 1
-            elif i + 1 < n and content[i+1] == '=': # ==
-                current_chunk.append('==')
-                i += 2
-            else:
-                # É um sinal de igualdade top-level válido
-                chunks.append("".join(current_chunk).strip())
-                current_chunk = []
-                i += 1
-        else:
-            current_chunk.append(char)
-            i += 1
-            
-    if current_chunk:
-        chunks.append("".join(current_chunk).strip())
-        
-    # Se temos 3 ou mais partes (pelo menos 2 '=' encadeados) e tamanho razoável (>35 chars)
-    if len(chunks) >= 3 and len(content) > 35:
-        first = chunks[0]
-        rest = chunks[1:]
-        aligned_lines = [f"{first} &= {rest[0]}"]
-        for item in rest[1:]:
-            aligned_lines.append(f"&= {item}")
-        return "\\begin{aligned}\n" + " \\\\\n".join(aligned_lines) + "\n\\end{aligned}"
-        
-    return content
-
 def sanitize_display_math(content: str) -> str:
     """Sanitiza o conteúdo interno de um bloco de Display Math ($$...$$)."""
     c = content.strip()
@@ -105,9 +41,6 @@ def sanitize_display_math(content: str) -> str:
         if len(c_lines) > 1:
             c = "\\begin{aligned}\n" + " \\\\\n".join(c_lines) + "\n\\end{aligned}"
     
-    # 9. Converte equações encadeadas longas (A = B = C = D) em \begin{aligned} multilinhas
-    c = split_chained_display_math(c)
-    
     return c.strip()
 
 def sanitize_inline_math(content: str) -> str:
@@ -134,15 +67,30 @@ def sanitize_latex_string(text: str) -> str:
 
     processed = text.strip()
 
-    # 1. Protege moedas na prosa normal
-    processed = re.sub(r'\\text\{R[\\\$]*\}\s*', r'R\\$ ', processed)
-    processed = re.sub(r'\\text\{US[\\\$]*\}\s*', r'US\\$ ', processed)
-    processed = re.sub(r'\\text\{R\}\s*', r'R\\$ ', processed)
-    processed = re.sub(r'(?<!\\)R\$\s*(\d)', r'R\\$ \1', processed)
-    processed = re.sub(r'(?<!\\)US\$\s*(\d)', r'US\\$ \1', processed)
+    # 1.0 Converte quebras de linha literais escapadas (\n\n ou \n) para quebras de linha reais no Markdown
+    processed = processed.replace(r'\r\n', '\n')
+    processed = re.sub(r'\\n\\n+', '\n\n', processed)
+    processed = re.sub(r'\\n(?=[\s\n\r\t\d.,;:!?\(\)\[\]\{\}"\'“”«»A-ZÁ-ÿ])', '\n', processed)
+    processed = re.sub(r'\\n(?![a-z])', '\n', processed)
 
-    # 2. Normaliza delimitadores clássicos LaTeX
-    processed = processed.replace(r'\[', '\n$$\n').replace(r'\]', '\n$$\n')
+    # 1.1 Limpa entidades HTML corrompidas ou grafias quebradas comuns
+    processed = processed.replace("&bar;", r"\bar ").replace("&sum;", r"\sum ").replace("&Sigma;", r"\Sigma ")
+    processed = re.sub(r'\\bar([a-zA-Z])(?![a-zA-Z])', r'\\bar{\1}', processed)
+    processed = re.sub(r'\\Sigma(?=\s*\(x_i)', r'\\sum', processed)
+
+    # 1.2 Recupera caracteres de controle gerados por escape indevido em JS (\f -> \frac, \b -> \bar, perda de barras)
+    processed = re.sub(r'[\x0c\u000c]rac', r'\\frac', processed)
+    processed = re.sub(r'[\x08\u0008]ar\{', r'\\bar{', processed)
+    processed = re.sub(r'[\x08\u0008]eta', r'\\beta', processed)
+    processed = re.sub(r'[\x08\u0008]inom', r'\\binom', processed)
+    processed = re.sub(r'[\x08\u0008]mathbf', r'\\mathbf', processed)
+    processed = re.sub(r'(?<![\\f\x0c\u000c])rac\{', r'\\frac{', processed)
+    processed = re.sub(r'(?<!\\)omega([_\s\^\{])', r'\\omega\1', processed)
+    processed = re.sub(r'(?<!\\)quad(?=[\s\$\(\)])', r'\\quad', processed)
+
+    # 2. Normaliza delimitadores clássicos LaTeX sem destruir quebras com espaçamento como \\[8pt]
+    processed = re.sub(r'(?<!\\)\\\[(?![\d\w\s.]*\])', '\n$$\n', processed)
+    processed = re.sub(r'(?<!\\)\\\]', '\n$$\n', processed)
     processed = processed.replace(r'\(', '$').replace(r'\)', '$')
 
     # 2.5 Desaninha equações onde o modelo abriu $ antes da fórmula e depois colocou $$ para a matriz
@@ -171,11 +119,7 @@ def sanitize_latex_string(text: str) -> str:
         elif part.startswith('$') and part.endswith('$') and len(part) >= 2 and '\n' not in part:
             inner = part[1:-1]
             sanitized_inner = sanitize_inline_math(inner)
-            chained = split_chained_display_math(sanitized_inner)
-            if r'\begin{aligned}' in chained:
-                result_parts.append(f"\n$$\n{chained}\n$$\n")
-            else:
-                result_parts.append(f"${sanitized_inner}$")
+            result_parts.append(f"${sanitized_inner}$")
         else:
             # Prosa comum (fora de cifrões)
             prose = part

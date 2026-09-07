@@ -37,41 +37,27 @@ body {
   word-break: normal;
 }
 
-/* Display math ($$) com suporte a rolagem horizontal suave e discreta */
+/* Display math ($$) com quebra suave e sem barras de rolagem */
 .katex-display {
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
   max-width: 100%;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(203, 213, 225, 0.4) transparent;
-}
-
-.katex-display::-webkit-scrollbar {
-  height: 3px;
-}
-
-.katex-display::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.katex-display::-webkit-scrollbar-thumb {
-  background: rgba(203, 213, 225, 0.4);
-  border-radius: 3px;
-}
-
-.katex-display::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.7);
 }
 
 .katex-display > .katex {
   max-width: 100%;
   text-align: center;
+  white-space: normal !important;
+}
+
+.katex-display > .katex > .katex-html {
+  white-space: normal !important;
 }
 
 .katex {
-  text-rendering: auto;
+  white-space: normal !important;
 }
 
 .markdown-body table, .markdown-body pre {

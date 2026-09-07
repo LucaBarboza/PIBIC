@@ -3,76 +3,6 @@
  * Enforces 100% valid KaTeX / ReactMarkdown parsing across titles, boxes, and prose.
  */
 
-function splitChainedDisplayMath(content: string): string {
-  if (content.includes('\\begin{')) {
-    return content;
-  }
-
-  const chunks: string[] = [];
-  let currentChunk: string[] = [];
-  let depth = 0;
-  const n = content.length;
-  let i = 0;
-
-  while (i < n) {
-    const char = content[i];
-    if (char === '{' || char === '[') {
-      depth++;
-      currentChunk.push(char);
-      i++;
-    } else if (char === '}' || char === ']') {
-      depth = Math.max(0, depth - 1);
-      currentChunk.push(char);
-      i++;
-    } else if (char === '=' && depth === 0) {
-      const prevStr = currentChunk.join('').trimEnd();
-      if (
-        prevStr.endsWith('\\le') ||
-        prevStr.endsWith('\\ge') ||
-        prevStr.endsWith('\\ne') ||
-        prevStr.endsWith('\\leq') ||
-        prevStr.endsWith('\\geq') ||
-        prevStr.endsWith('\\approx') ||
-        prevStr.endsWith('\\equiv') ||
-        prevStr.endsWith('!') ||
-        prevStr.endsWith('<') ||
-        prevStr.endsWith('>') ||
-        prevStr.endsWith(':') ||
-        prevStr.endsWith('~')
-      ) {
-        currentChunk.push(char);
-        i++;
-      } else if (i + 1 < n && content[i + 1] === '=') {
-        currentChunk.push('==');
-        i += 2;
-      } else {
-        chunks.push(currentChunk.join('').trim());
-        currentChunk = [];
-        i++;
-      }
-    } else {
-      currentChunk.push(char);
-      i++;
-    }
-  }
-
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk.join('').trim());
-  }
-
-  if (chunks.length >= 3 && content.length > 35) {
-    const first = chunks[0];
-    const rest = chunks.slice(1);
-    const alignedLines = [`${first} &= ${rest[0]}`];
-    for (let idx = 1; idx < rest.length; idx++) {
-      alignedLines.push(`&= ${rest[idx]}`);
-    }
-    return `\\begin{aligned}\n${alignedLines.join(' \\\\\n')}\n\\end{aligned}`;
-  }
-
-  return content;
-}
-
 function sanitizeDisplayMath(content: string): string {
   let c = content.trim();
   // 1. Converte ambientes incompatíveis com o rehype-katex
@@ -107,9 +37,6 @@ function sanitizeDisplayMath(content: string): string {
     c = `\\begin{aligned}\n${c}\n\\end{aligned}`;
   }
 
-  // 8. Converte equações encadeadas longas (A = B = C = D) em \begin{aligned} multilinhas
-  c = splitChainedDisplayMath(c);
-
   return c.trim();
 }
 
@@ -132,15 +59,29 @@ export function sanitizeLatex(text: string): string {
   if (!text) return "";
   let processed = text.trim();
 
-  // 1. Protege moedas na prosa normal
-  processed = processed.replace(/\\text\{R[\\\$]*\}\s*/g, 'R\\$ ');
-  processed = processed.replace(/\\text\{US[\\\$]*\}\s*/g, 'US\\$ ');
-  processed = processed.replace(/\\text\{R\}\s*/g, 'R\\$ ');
-  processed = processed.replace(/(?<!\\)R\$\s*(\d)/g, 'R\\$ $1');
-  processed = processed.replace(/(?<!\\)US\$\s*(\d)/g, 'US\\$ $1');
+  // 1.0 Converte quebras de linha literais escapadas (\n\n ou \n) para quebras de linha reais no Markdown
+  processed = processed.replace(/\\r\\n/g, '\n');
+  processed = processed.replace(/\\n\\n+/g, '\n\n');
+  processed = processed.replace(/\\n(?=[\s\n\r\t\d.,;:!?\(\)\[\]\{\}"'“”«»A-ZÁ-ÿ])/g, '\n');
+  processed = processed.replace(/\\n(?![a-z])/g, '\n');
 
-  // 2. Normaliza delimitadores clássicos LaTeX
-  processed = processed.replace(/\\\[/g, '\n$$\n').replace(/\\\]/g, '\n$$\n');
+  // 1.1 Limpa entidades HTML corrompidas ou grafias quebradas comuns
+  processed = processed.replace(/&bar;/g, '\\bar ').replace(/&sum;/g, '\\sum ').replace(/&Sigma;/g, '\\Sigma ');
+  processed = processed.replace(/\\bar([a-zA-Z])(?![a-zA-Z])/g, '\\bar{$1}');
+  processed = processed.replace(/\\Sigma(?=\s*\(x_i)/g, '\\sum');
+
+  // 1.2 Recupera caracteres de controle gerados por escape indevido em JS (\f -> \frac, \b -> \bar, perda de barras)
+  processed = processed.replace(/[\x0c\u000c]rac/g, '\\frac');
+  processed = processed.replace(/[\x08\u0008]ar\{/g, '\\bar{');
+  processed = processed.replace(/[\x08\u0008]eta/g, '\\beta');
+  processed = processed.replace(/[\x08\u0008]inom/g, '\\binom');
+  processed = processed.replace(/[\x08\u0008]mathbf/g, '\\mathbf');
+  processed = processed.replace(/(?<![\\f\x0c\u000c])rac\{/g, '\\frac{');
+  processed = processed.replace(/(?<!\\)omega([_\s\^\{])/g, '\\omega$1');
+  processed = processed.replace(/(?<!\\)quad(?=[\s\$\(\)])/g, '\\quad');
+
+  // 2. Normaliza delimitadores clássicos LaTeX sem destruir quebras com espaçamento como \\[8pt]
+  processed = processed.replace(/(?<!\\)\\\[(?![\d\w\s.]*\])/g, '\n$$\n').replace(/(?<!\\)\\\]/g, '\n$$\n');
   processed = processed.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
 
   // 3. Se a string contiver \begin{aligned} ou \begin{...} sem $$, envolve em $$
@@ -163,12 +104,7 @@ export function sanitizeLatex(text: string): string {
     } else if (part.startsWith('$') && part.endsWith('$') && part.length >= 2 && !part.includes('\n')) {
       const inner = part.slice(1, -1);
       const sanitizedInner = sanitizeInlineMath(inner);
-      const chained = splitChainedDisplayMath(sanitizedInner);
-      if (chained.includes('\\begin{aligned}')) {
-        resultParts.push(`\n$$\n${chained}\n$$\n`);
-      } else {
-        resultParts.push(`$${sanitizedInner}$`);
-      }
+      resultParts.push(`$${sanitizedInner}$`);
     } else {
       // Prosa comum (fora de cifrões)
       let prose = part;
