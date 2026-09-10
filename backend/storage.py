@@ -136,20 +136,18 @@ class StorageManager:
             with open(txt_path, "r", encoding="utf-8") as f:
                 return {"id": id_disciplina, "nome": id_disciplina, "ementa_texto": f.read()}
                 
-        # Procurar PDF correspondente
+        # Procurar PDF correspondente com IA multimodal
         if os.path.exists(base_ementa_dir):
             for fname in os.listdir(base_ementa_dir):
                 if fname.lower().startswith(id_disciplina.lower()) and fname.endswith(".pdf"):
                     try:
-                        import pypdf
-                        reader = pypdf.PdfReader(os.path.join(base_ementa_dir, fname))
-                        texto = ""
-                        for page in reader.pages:
-                            texto += page.extract_text() or ""
-                        if texto.strip():
+                        import agente_extrator
+                        pdf_path = os.path.join(base_ementa_dir, fname)
+                        texto = agente_extrator.extrair_texto_base_pdf(pdf_path, tema_aula=f"Ementa {id_disciplina}")
+                        if texto and texto.strip():
                             return {"id": id_disciplina, "nome": f"Disciplina {id_disciplina}", "ementa_texto": texto}
                     except Exception as e:
-                        print(f"[STORAGE WARNING] Erro ao extrair PDF ementa {fname}: {e}")
+                        print(f"[STORAGE WARNING] Erro ao extrair PDF ementa com IA {fname}: {e}")
                         
         # Fallback padrao
         return {

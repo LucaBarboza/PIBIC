@@ -243,6 +243,8 @@ export default function ProfessorSemesterViewer() {
   const [novaAulaDescricao, setNovaAulaDescricao] = useState("");
   const [novaAulaModeloLlm, setNovaAulaModeloLlm] = useState<"2.5" | "3.5">("3.5");
   const [novaAulaPdf, setNovaAulaPdf] = useState("");
+  const [novaAulaArquivoId, setNovaAulaArquivoId] = useState("");
+  const [novaAulaNomeArquivo, setNovaAulaNomeArquivo] = useState("");
   const [novaAulaGerarExercicios, setNovaAulaGerarExercicios] = useState(true);
   const [novaAulaSugestoesExercicios, setNovaAulaSugestoesExercicios] = useState("");
   const [novaAulaGerarSimulador, setNovaAulaGerarSimulador] = useState(true);
@@ -257,15 +259,17 @@ export default function ProfessorSemesterViewer() {
     if (!file.name.toLowerCase().endsWith(".pdf")) return alert("Somente PDF");
     setUploadingNovaAula(true);
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("files", file);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
       const data = await res.json();
       if (res.ok) {
-        setNovaAulaPdf(data.texto_extraido);
+        setNovaAulaPdf(data.texto_extraido || (data.arquivo_id ? `[PDF_ID:${data.arquivo_id}]` : ""));
+        setNovaAulaArquivoId(data.arquivo_id || "");
+        setNovaAulaNomeArquivo(file.name);
       } else {
-        alert("Erro no upload");
+        alert("Erro no upload: " + (data.detail || "Falha ao enviar arquivo"));
       }
     } catch (e) {
       alert("Erro na rede");
@@ -290,6 +294,8 @@ export default function ProfessorSemesterViewer() {
             titulo: novaAulaTitulo,
             descricao: novaAulaDescricao + (novaAulaGerarExercicios && novaAulaSugestoesExercicios ? `\n(Dica p/ Exercícios: ${novaAulaSugestoesExercicios})` : "") + (novaAulaGerarSimulador && novaAulaSugestoesSimulador ? `\n(Dica p/ Simulador: ${novaAulaSugestoesSimulador})` : ""),
             texto_base_pdf: novaAulaPdf,
+            arquivo_base_id: novaAulaArquivoId,
+            nome_arquivo: novaAulaNomeArquivo,
             gerar_exercicios: novaAulaGerarExercicios,
             gerar_simulador: novaAulaGerarSimulador
           },
@@ -300,6 +306,8 @@ export default function ProfessorSemesterViewer() {
       setNovaAulaTitulo("");
       setNovaAulaDescricao("");
       setNovaAulaPdf("");
+      setNovaAulaArquivoId("");
+      setNovaAulaNomeArquivo("");
       setModalSucessoOpen(true);
     } catch (e) {
       alert("Erro ao criar nova aula");
@@ -544,9 +552,13 @@ export default function ProfessorSemesterViewer() {
                   <label className="block text-sm font-bold text-slate-800 mb-1">Upload de Material Base (PDF Opcional)</label>
                   <input type="file" ref={fileInputRef} className="hidden" onChange={e => e.target.files && handleFileUpload(e.target.files[0])} accept=".pdf" />
                   <button onClick={() => fileInputRef.current?.click()} className="bg-slate-50 border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold px-4 py-3 rounded-lg text-sm w-full transition" disabled={uploadingNovaAula}>
-                    {uploadingNovaAula ? "Extraindo texto do PDF..." : "📎 Anexar PDF Específico"}
+                    {uploadingNovaAula ? "Enviando..." : "📎 Anexar PDF Específico"}
                   </button>
-                  {novaAulaPdf && <p className="text-green-700 text-xs mt-2 font-bold bg-green-50 p-2 rounded border border-green-200">✓ PDF carregado e lido com sucesso!</p>}
+                  {novaAulaPdf && (
+                    <p className="text-green-700 text-xs mt-2 font-bold bg-green-50 p-2 rounded border border-green-200">
+                      ✓ {novaAulaNomeArquivo || "PDF anexado"} <span className="text-slate-400 font-normal">(IA analisará em background)</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Artesão Completo */}

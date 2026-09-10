@@ -49,6 +49,8 @@ export default function CriarSalaPersonalizada() {
     descricao: "",
     texto_base_pdf: "",
     texto_base_notacoes: "",
+    arquivo_base_id: "",
+    arquivo_notacoes_id: "",
     nome_arquivo: "",
     nome_arquivo_notacoes: "",
     uploading: false,
@@ -102,10 +104,10 @@ export default function CriarSalaPersonalizada() {
       const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
       const data = await res.json();
       if (res.ok) {
-        setArquivoGlobalPdf(data.texto_extraido);
-        setArquivoGlobalNome(`${validFilesCount} arquivo(s) processado(s) com sucesso`);
+        setArquivoGlobalPdf(data.texto_extraido || (data.arquivo_id ? `[PDF_ID:${data.arquivo_id}]` : ""));
+        setArquivoGlobalNome(`✓ ${validFilesCount} arquivo(s) anexado(s) (IA analisará em background)`);
       } else {
-        alert("Erro no upload: " + data.detail);
+        alert("Erro no upload: " + (data.detail || "Falha ao enviar"));
       }
     } catch (e) {
       alert("Erro de rede");
@@ -132,10 +134,11 @@ export default function CriarSalaPersonalizada() {
       const nextUpdated = [...aulasManuais];
       
       if (res.ok) {
-        nextUpdated[index].texto_base_pdf = data.texto_extraido;
+        nextUpdated[index].texto_base_pdf = data.texto_extraido || (data.arquivo_id ? `[PDF_ID:${data.arquivo_id}]` : "");
+        nextUpdated[index].arquivo_base_id = data.arquivo_id || "";
         nextUpdated[index].nome_arquivo = file.name;
       } else {
-        alert("Erro no upload: " + data.detail);
+        alert("Erro no upload: " + (data.detail || "Falha ao enviar"));
       }
       nextUpdated[index].uploading = false;
       setAulasManuais(nextUpdated);
@@ -165,10 +168,11 @@ export default function CriarSalaPersonalizada() {
       const nextUpdated = [...aulasManuais];
       
       if (res.ok) {
-        nextUpdated[index].texto_base_notacoes = data.texto_extraido;
+        nextUpdated[index].texto_base_notacoes = data.texto_extraido || (data.arquivo_id ? `[PDF_ID:${data.arquivo_id}]` : "");
+        nextUpdated[index].arquivo_notacoes_id = data.arquivo_id || "";
         nextUpdated[index].nome_arquivo_notacoes = file.name;
       } else {
-        alert("Erro no upload: " + data.detail);
+        alert("Erro no upload: " + (data.detail || "Falha ao enviar"));
       }
       nextUpdated[index].uploading_notacoes = false;
       setAulasManuais(nextUpdated);
@@ -187,6 +191,8 @@ export default function CriarSalaPersonalizada() {
       descricao: "",
       texto_base_pdf: "",
       texto_base_notacoes: "",
+      arquivo_base_id: "",
+      arquivo_notacoes_id: "",
       nome_arquivo: "",
       nome_arquivo_notacoes: "",
       uploading: false,
@@ -254,6 +260,10 @@ export default function CriarSalaPersonalizada() {
           descricao: a.descricao + (a.gerar_exercicios && a.sugestoes_exercicios ? `\n(Dica p/ Exercícios: ${a.sugestoes_exercicios})` : "") + (a.gerar_simulador && a.sugestoes_simulador ? `\n(Dica p/ Simulador: ${a.sugestoes_simulador})` : ""),
           texto_base_pdf: a.texto_base_pdf || "",
           texto_base_notacoes: a.texto_base_notacoes || "",
+          arquivo_base_id: a.arquivo_base_id || "",
+          arquivo_notacoes_id: a.arquivo_notacoes_id || "",
+          nome_arquivo: a.nome_arquivo || "",
+          nome_arquivo_notacoes: a.nome_arquivo_notacoes || "",
           gerar_exercicios: a.gerar_exercicios,
           gerar_simulador: a.gerar_simulador
       })) : [];
@@ -365,7 +375,7 @@ export default function CriarSalaPersonalizada() {
                         className="bg-slate-800 text-white px-8 py-3 rounded-full font-bold shadow-md hover:bg-slate-700 transition"
                         disabled={uploadingGlobal}
                     >
-                        {uploadingGlobal ? "Extraindo textos..." : "📎 Anexar Múltiplos PDFs"}
+                        {uploadingGlobal ? "Enviando..." : "📎 Anexar Múltiplos PDFs"}
                     </button>
                     {arquivoGlobalNome && <p className="text-green-600 mt-4 font-bold bg-green-50 inline-block px-4 py-2 rounded-full border border-green-200">✓ {arquivoGlobalNome}</p>}
 
@@ -411,8 +421,6 @@ export default function CriarSalaPersonalizada() {
                                 {idx + 1}
                             </div>
                             
-
-                            
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 mt-2">
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-2">Título da Aula (Tema Principal)</label>
@@ -437,10 +445,14 @@ export default function CriarSalaPersonalizada() {
                                             className="bg-slate-50 border border-slate-300 text-slate-700 px-4 py-3 rounded-lg text-sm font-bold hover:bg-slate-100 flex-1 flex justify-center items-center transition shadow-sm"
                                             disabled={bloco.uploading}
                                         >
-                                            {bloco.uploading ? "Lendo PDF..." : "📎 Escolher PDF Específico"}
+                                            {bloco.uploading ? "Enviando PDF..." : "📎 Escolher PDF Específico"}
                                         </button>
                                     </div>
-                                    {bloco.nome_arquivo && <p className="text-xs text-green-600 mt-2 font-bold px-2">✓ {bloco.nome_arquivo}</p>}
+                                    {bloco.nome_arquivo && (
+                                        <p className="text-xs text-green-600 mt-2 font-bold px-2">
+                                            ✓ {bloco.nome_arquivo} <span className="text-slate-400 font-normal">(IA analisará em background)</span>
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             
@@ -481,11 +493,13 @@ export default function CriarSalaPersonalizada() {
                                                     className="bg-white border border-slate-300 text-slate-700 px-4 py-3 rounded-lg text-sm font-bold hover:bg-slate-100 flex-1 flex justify-center items-center transition shadow-sm"
                                                     disabled={bloco.uploading_notacoes}
                                                 >
-                                                    {bloco.uploading_notacoes ? "Lendo PDF..." : "📎 Carregar PDF de Notações"}
+                                                    {bloco.uploading_notacoes ? "Enviando PDF..." : "📎 Carregar PDF de Notações"}
                                                 </button>
                                             </div>
                                             {bloco.nome_arquivo_notacoes && (
-                                                <p className="text-xs text-green-600 mt-2 font-bold px-2">✓ {bloco.nome_arquivo_notacoes}</p>
+                                                <p className="text-xs text-green-600 mt-2 font-bold px-2">
+                                                    ✓ {bloco.nome_arquivo_notacoes} <span className="text-slate-400 font-normal">(IA analisará em background)</span>
+                                                </p>
                                             )}
                                         </div>
 

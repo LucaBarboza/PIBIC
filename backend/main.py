@@ -4,7 +4,8 @@ load_dotenv()
 from fastapi import FastAPI, HTTPException, BackgroundTasks, File, UploadFile
 from concurrent.futures import ThreadPoolExecutor
 from fastapi.middleware.cors import CORSMiddleware
-import pypdf
+import uuid
+import re
 import io
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -12,10 +13,49 @@ from pydantic import BaseModel
 import gerador_conteudo
 import orquestrador_editorial
 import agente_validador_latex
+import agente_extrator
 from macro_roteirista import MacroRoteirista
 
 import json
 from logger_agentes import AgentLogger
+
+# Diretório para armazenamento seguro de uploads de PDFs (100% nativo)
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "data_local", "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+def resolver_caminho_pdf(id_ou_ref: str) -> Optional[str]:
+    """
+    Localiza o caminho em disco de um PDF enviado pelo professor.
+    Aceita:
+    - Marcador: [PDF_ID:...] ou [PDF_SALVO_ID:...]
+    - ID do arquivo salvo em data_local/uploads
+    - Caminho de arquivo absoluto existente
+    """
+    if not id_ou_ref or not isinstance(id_ou_ref, str):
+        return None
+    s = id_ou_ref.strip()
+    if not s:
+        return None
+
+    if s.startswith("[PDF_ID:") and s.endswith("]"):
+        arq_id = s[len("[PDF_ID:"): -1].strip()
+        caminho = os.path.join(UPLOAD_DIR, arq_id)
+        if os.path.exists(caminho):
+            return caminho
+    if s.startswith("[PDF_SALVO_ID:") and s.endswith("]"):
+        arq_id = s[len("[PDF_SALVO_ID:"): -1].strip()
+        caminho = os.path.join(UPLOAD_DIR, arq_id)
+        if os.path.exists(caminho):
+            return caminho
+
+    caminho_direto = os.path.join(UPLOAD_DIR, s)
+    if os.path.exists(caminho_direto) and os.path.isfile(caminho_direto):
+        return caminho_direto
+
+    if os.path.isabs(s) and os.path.exists(s) and os.path.isfile(s):
+        return s
+
+    return None
 
 def _parse_firebase_credentials(raw_val: str) -> dict:
     if not raw_val:
@@ -103,6 +143,10 @@ class AulaManual(BaseModel):
     descricao: str
     texto_base_pdf: Optional[str] = ""
     texto_base_notacoes: Optional[str] = ""
+    arquivo_base_id: Optional[str] = ""
+    arquivo_notacoes_id: Optional[str] = ""
+    nome_arquivo: Optional[str] = ""
+    nome_arquivo_notacoes: Optional[str] = ""
     gerar_exercicios: bool = True
     gerar_simulador: bool = False
 
@@ -134,7 +178,7 @@ def log_debug(sala_id, msg):
         pass
 
 def obter_ementa_texto(id_disciplina: str):
-    """Busca ementa no Firestore com fallback automático para os PDFs locais da pasta ementas/"""
+    """Busca ementa no Firestore com fallback para arquivos TXT locais da pasta ementas/"""
     disc_data = storage.get_disciplina(id_disciplina)
     if disc_data and disc_data.get("ementa_texto"):
         return disc_data["ementa_texto"], disc_data.get("nome", id_disciplina)
@@ -142,17 +186,16 @@ def obter_ementa_texto(id_disciplina: str):
     ementas_dir = os.path.join(os.path.dirname(__file__), "ementas")
     if os.path.exists(ementas_dir):
         for fname in os.listdir(ementas_dir):
-            if fname.lower().startswith(id_disciplina.lower()) and fname.endswith(".pdf"):
+            if fname.lower().startswith(id_disciplina.lower()) and fname.endswith(".txt"):
                 try:
                     fpath = os.path.join(ementas_dir, fname)
-                    with open(fpath, "rb") as f:
-                        reader = pypdf.PdfReader(f)
-                        texto = "\n".join([p.extract_text() for p in reader.pages if p.extract_text()])
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        texto = f.read().strip()
                         if texto:
-                            print(f"[FALLBACK] Ementa da disciplina {id_disciplina} carregada direto do PDF local: {fname}")
+                            print(f"[FALLBACK] Ementa da disciplina {id_disciplina} carregada direto de: {fname}")
                             return texto, id_disciplina
                 except Exception as e:
-                    print(f"[ERRO] Falha ao ler PDF local {fname}: {e}")
+                    print(f"[ERRO] Falha ao ler ementa TXT local {fname}: {e}")
 
     return "", id_disciplina
 
@@ -180,21 +223,38 @@ def processar_semestre_background(req: SemestreRequest):
                         "topicos_abordados": [aula_manual.descricao],
                         "texto_base_pdf": aula_manual.texto_base_pdf,
                         "texto_base_notacoes": aula_manual.texto_base_notacoes,
+                        "arquivo_base_id": aula_manual.arquivo_base_id or "",
+                        "arquivo_notacoes_id": aula_manual.arquivo_notacoes_id or "",
+                        "nome_arquivo": aula_manual.nome_arquivo or "",
+                        "nome_arquivo_notacoes": aula_manual.nome_arquivo_notacoes or "",
                         "gerar_exercicios": aula_manual.gerar_exercicios,
                         "gerar_simulador": aula_manual.gerar_simulador
                     })
             elif req.tipo_crie_seu_jeito == "automatico":
                 print("[BACKGROUND] Modo Crie do Seu Jeito Automático: Usando PDF do professor como ementa.")
-                storage.update_classroom(req.id_sala, {"status": "fatiando_ementa_pdf"})
+                storage.update_classroom(req.id_sala, {"status": "fatiando_ementa_pdf", "detalhe_progresso": "Extraindo ementa do PDF com IA multimodal..."})
+                
+                texto_global_ementa = req.arquivo_global_pdf
+                caminho_global = resolver_caminho_pdf(req.arquivo_global_pdf)
+                if caminho_global:
+                    log_debug(req.id_sala, f"Extraindo ementa de PDF global '{os.path.basename(caminho_global)}' com IA multimodal...")
+                    texto_extraido = agente_extrator.extrair_texto_base_pdf(
+                        caminho_global,
+                        tema_aula=f"Ementa Geral {nome_disciplina}",
+                        modelo_llm=req.modelo_llm
+                    )
+                    if texto_extraido:
+                        texto_global_ementa = texto_extraido
+
                 macro = MacroRoteirista()
                 diretrizes_macro = ""
                 if req.instrucoes_personalizadas:
                     diretrizes_macro += f"Instruções e Persona do Professor:\n{req.instrucoes_personalizadas}\n\n"
-                if req.arquivo_global_pdf:
-                    diretrizes_macro += f"Material / PDF Completo do Professor:\n{req.arquivo_global_pdf}\n\n"
+                if texto_global_ementa and not texto_global_ementa.startswith("[PDF_ID:"):
+                    diretrizes_macro += f"Material / PDF Completo do Professor:\n{texto_global_ementa}\n\n"
                 
                 cronograma = macro.gerar_cronograma(
-                    ementa_texto=req.arquivo_global_pdf or ementa_texto, 
+                    ementa_texto=texto_global_ementa if (texto_global_ementa and not texto_global_ementa.startswith("[PDF_ID:")) else ementa_texto, 
                     instrucoes_personalizadas=req.instrucoes_personalizadas, 
                     diretrizes_texto=diretrizes_macro,
                     tipo_carga_horaria=req.tipo_carga_horaria,
@@ -264,26 +324,63 @@ def processar_semestre_background(req: SemestreRequest):
             if topicos_proibidos:
                 diretrizes += f"\nATENÇÃO ESTRITA - TÓPICOS PROIBIDOS: {topicos_proibidos}. Você NÃO PODE abordar NENHUM desses assuntos nesta aula, pois serão dados futuramente. Fique apenas nos seus tópicos."
             
-            # Adiciona o arquivo pdf/texto se tiver (modo manual)
-            material_apoio = aula.get("texto_base_pdf", "")
-            if material_apoio:
-                diretrizes += f"\nATENÇÃO ESTRITA - MATERIAL DE APOIO DO PROFESSOR: Baseie toda a estrutura desta aula, os exemplos, as explicações e o contexto exclusivamente ou prioritariamente no material a seguir fornecido pelo professor:\n\n{material_apoio}\n\n[FIM DO MATERIAL DO PROFESSOR]."
-            
             logger = AgentLogger(db, req.id_sala, numero)
             logger.log(f"Iniciando geracao da Aula {numero}", "info")
-            
-            notacoes_raw = aula.get("texto_base_notacoes", "")
-            override_prompt_block = ""
-            if notacoes_raw and notacoes_raw.strip():
-                import agente_extrator
-                log_debug(req.id_sala, f"Aula {numero}: Extraindo notações e diretrizes específicas com Agente Extrator...")
-                override_dict = agente_extrator.extrair_regras_override(notacoes_raw, logger=logger)
-                if override_dict:
-                    override_prompt_block = agente_extrator.formatar_override_para_prompt(override_dict)
-                    diretrizes = f"{override_prompt_block}\n\n{diretrizes}"
-            
+
             from telemetry import TokenTracker
             tracker = TokenTracker(modo_llm=req.modelo_llm)
+
+            # 1. Material de Apoio do Professor (Texto ou PDF processado por IA multimodal em background)
+            material_apoio = ""
+            material_ref = aula.get("arquivo_base_id") or aula.get("texto_base_pdf", "")
+            caminho_mat_pdf = resolver_caminho_pdf(material_ref)
+            if caminho_mat_pdf:
+                nome_arq_pdf = aula.get("nome_arquivo") or os.path.basename(caminho_mat_pdf)
+                log_debug(req.id_sala, f"Aula {numero}: Agente Extrator lendo PDF '{nome_arq_pdf}' com IA multimodal...")
+                storage.update_classroom(req.id_sala, {"detalhe_progresso": f"Aula {numero}: Agente Extrator lendo PDF '{nome_arq_pdf}' com IA..."})
+                material_apoio = agente_extrator.extrair_texto_base_pdf(
+                    caminho_mat_pdf,
+                    tema_aula=titulo,
+                    logger=logger,
+                    modelo_llm=req.modelo_llm,
+                    tracker=tracker
+                )
+            elif aula.get("texto_base_pdf") and not str(aula.get("texto_base_pdf", "")).startswith("[PDF_ID:"):
+                material_apoio = aula.get("texto_base_pdf", "")
+
+            if material_apoio and material_apoio.strip():
+                diretrizes += f"\nATENÇÃO ESTRITA - MATERIAL DE APOIO DO PROFESSOR: Baseie toda a estrutura desta aula, os exemplos, as explicações e o contexto exclusivamente ou prioritariamente no material a seguir fornecido pelo professor:\n\n{material_apoio}\n\n[FIM DO MATERIAL DO PROFESSOR]."
+
+            # 2. Notações e Diretrizes do Professor (Texto ou PDF processado por IA multimodal em background)
+            override_prompt_block = ""
+            notacoes_ref = aula.get("arquivo_notacoes_id") or aula.get("texto_base_notacoes", "")
+            caminho_notacoes_pdf = resolver_caminho_pdf(notacoes_ref)
+            override_dict = None
+
+            if caminho_notacoes_pdf:
+                nome_arq_not = aula.get("nome_arquivo_notacoes") or os.path.basename(caminho_notacoes_pdf)
+                log_debug(req.id_sala, f"Aula {numero}: Agente Extrator mapeando notações do PDF '{nome_arq_not}' com IA...")
+                storage.update_classroom(req.id_sala, {"detalhe_progresso": f"Aula {numero}: Agente Extrator mapeando notações de PDF com IA..."})
+                override_dict = agente_extrator.extrair_regras_override_pdf(
+                    caminho_notacoes_pdf,
+                    logger=logger,
+                    modelo_llm=req.modelo_llm,
+                    tracker=tracker
+                )
+            else:
+                notacoes_raw = aula.get("texto_base_notacoes", "")
+                if notacoes_raw and notacoes_raw.strip() and not str(notacoes_raw).startswith("[PDF_ID:"):
+                    log_debug(req.id_sala, f"Aula {numero}: Extraindo notações e diretrizes específicas com Agente Extrator...")
+                    override_dict = agente_extrator.extrair_regras_override(
+                        notacoes_raw,
+                        logger=logger,
+                        modelo_llm=req.modelo_llm,
+                        tracker=tracker
+                    )
+
+            if override_dict:
+                override_prompt_block = agente_extrator.formatar_override_para_prompt(override_dict)
+                diretrizes = f"{override_prompt_block}\n\n{diretrizes}"
 
             conteudo_bruto = gerador_conteudo.gerar_conteudo_aula(
                 nome_professor="Professor UFBA",
@@ -359,27 +456,64 @@ def gerar_semestre(req: SemestreRequest, background_tasks: BackgroundTasks):
     return {"message": "Semestre em processamento", "sala": req.id_sala}
 
 @app.post("/api/upload_pdf")
-async def upload_pdf(files: List[UploadFile] = File(...)):
-    texto_completo = ""
-    
-    for file in files:
-        if not file.filename.lower().endswith('.pdf'):
-            continue # Ignorar não-PDFs
+async def upload_pdf(
+    files: Optional[List[UploadFile]] = File(None),
+    file: Optional[UploadFile] = File(None)
+):
+    """
+    Upload 100% nativo e ultrarrápido (< 100ms) sem pypdf.
+    Salva o arquivo binário em data_local/uploads.
+    A extração do conteúdo com OCR, fórmulas em LaTeX e regras estruturadas
+    é realizada pelo Agente Extrator com IA multimodal em background.
+    """
+    lista_arquivos = []
+    if files:
+        lista_arquivos.extend(files)
+    if file:
+        lista_arquivos.append(file)
+        
+    if not lista_arquivos:
+        raise HTTPException(status_code=400, detail="Nenhum arquivo enviado.")
 
+    salvos = []
+    for f in lista_arquivos:
+        if not f.filename:
+            continue
+        nome_limpo = re.sub(r'[^a-zA-Z0-9_.-]', '_', f.filename)
+        ext = os.path.splitext(nome_limpo)[1].lower()
+        if ext != ".pdf":
+            continue
+            
+        arquivo_id = f"{uuid.uuid4().hex[:12]}_{nome_limpo}"
+        caminho_destino = os.path.join(UPLOAD_DIR, arquivo_id)
+        
         try:
-            content = await file.read()
-            reader = pypdf.PdfReader(io.BytesIO(content))
-            for page in reader.pages:
-                t = page.extract_text()
-                if t:
-                    texto_completo += t + "\n"
+            conteudo = await f.read()
+            if not conteudo:
+                continue
+            with open(caminho_destino, "wb") as buffer:
+                buffer.write(conteudo)
+                
+            salvos.append({
+                "id": arquivo_id,
+                "nome": f.filename,
+                "tamanho_bytes": len(conteudo),
+                "caminho": caminho_destino
+            })
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Erro processando {file.filename}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Erro ao salvar arquivo {f.filename}: {str(e)}")
 
-    if not texto_completo.strip():
-        raise HTTPException(status_code=400, detail="Nenhum texto pôde ser extraído dos arquivos.")
+    if not salvos:
+        raise HTTPException(status_code=400, detail="Nenhum arquivo PDF válido foi enviado.")
 
-    return {"status": "sucesso", "texto_extraido": texto_completo}
+    primeiro = salvos[0]
+    return {
+        "status": "sucesso",
+        "arquivo_id": primeiro["id"],
+        "nome_arquivo": primeiro["nome"],
+        "texto_extraido": f"[PDF_ID:{primeiro['id']}]",
+        "arquivos": salvos
+    }
 
 class EditarBlocoRequest(BaseModel):
     sala_id: str
@@ -566,27 +700,57 @@ def processar_aula_avulsa_background(req: AulaAvulsaRequest):
         logger = AgentLogger(db, req.sala_id, req.numero_aula)
         logger.log(f"Iniciando geracao da Aula Avulsa {req.numero_aula}", "info")
         
-        # Consolida todo o material de apoio, anotações e diretrizes para o Agente 1
-        materiais_professor = []
-        if req.aula_manual.texto_base_pdf:
-            materiais_professor.append(f"[MATERIAL DE APOIO / TEXTO BASE DO PROFESSOR]:\n{req.aula_manual.texto_base_pdf}")
-        if req.aula_manual.texto_base_notacoes:
-            materiais_professor.append(f"[ANOTAÇÕES DE NOTAÇÃO E LINGUAGEM DO PROFESSOR]:\n{req.aula_manual.texto_base_notacoes}")
-        if req.aula_manual.descricao:
-            materiais_professor.append(f"[DIRETRIZES PEDAGÓGICAS E OBJETIVOS DO PROFESSOR]:\n{req.aula_manual.descricao}")
-            
-        texto_consolidado_professor = "\n\n".join(materiais_professor)
-        override_prompt_block = ""
-        if texto_consolidado_professor.strip():
-            import agente_extrator
-            print(f"Aula Avulsa {req.numero_aula}: Extraindo notações, tom e diretrizes com Agente Extrator...")
-            override_dict = agente_extrator.extrair_regras_override(texto_consolidado_professor, logger=logger)
-            if override_dict:
-                override_prompt_block = agente_extrator.formatar_override_para_prompt(override_dict)
-                diretrizes = f"{override_prompt_block}\n\n{diretrizes}"
-                
         from telemetry import TokenTracker
         tracker = TokenTracker(modo_llm=req.modelo_llm)
+
+        # 1. Extração do Material de Apoio (se houver PDF ou texto)
+        material_apoio = ""
+        mat_ref = req.aula_manual.arquivo_base_id or req.aula_manual.texto_base_pdf or ""
+        caminho_mat_pdf = resolver_caminho_pdf(mat_ref)
+        if caminho_mat_pdf:
+            nome_arq = req.aula_manual.nome_arquivo or os.path.basename(caminho_mat_pdf)
+            db.collection("classrooms").document(req.sala_id).update({"detalhe_progresso": f"Aula Avulsa: Agente Extrator lendo PDF '{nome_arq}' com IA..."})
+            material_apoio = agente_extrator.extrair_texto_base_pdf(
+                caminho_mat_pdf,
+                tema_aula=titulo,
+                logger=logger,
+                modelo_llm=req.modelo_llm,
+                tracker=tracker
+            )
+        elif req.aula_manual.texto_base_pdf and not str(req.aula_manual.texto_base_pdf).startswith("[PDF_ID:"):
+            material_apoio = req.aula_manual.texto_base_pdf
+
+        if material_apoio and material_apoio.strip():
+            diretrizes += f"\nATENÇÃO ESTRITA - MATERIAL DE APOIO DO PROFESSOR: Baseie toda a estrutura desta aula, os exemplos, as explicações e o contexto exclusivamente ou prioritariamente no material a seguir fornecido pelo professor:\n\n{material_apoio}\n\n[FIM DO MATERIAL DO PROFESSOR]."
+
+        # 2. Extração de Notações e Diretrizes Específicas
+        override_prompt_block = ""
+        not_ref = req.aula_manual.arquivo_notacoes_id or req.aula_manual.texto_base_notacoes or ""
+        caminho_not_pdf = resolver_caminho_pdf(not_ref)
+        override_dict = None
+
+        if caminho_not_pdf:
+            nome_arq_not = req.aula_manual.nome_arquivo_notacoes or os.path.basename(caminho_not_pdf)
+            db.collection("classrooms").document(req.sala_id).update({"detalhe_progresso": f"Aula Avulsa: Agente Extrator mapeando notações de PDF com IA..."})
+            override_dict = agente_extrator.extrair_regras_override_pdf(
+                caminho_not_pdf,
+                logger=logger,
+                modelo_llm=req.modelo_llm,
+                tracker=tracker
+            )
+        else:
+            notacoes_raw = req.aula_manual.texto_base_notacoes or ""
+            if notacoes_raw.strip() and not str(notacoes_raw).startswith("[PDF_ID:"):
+                override_dict = agente_extrator.extrair_regras_override(
+                    notacoes_raw,
+                    logger=logger,
+                    modelo_llm=req.modelo_llm,
+                    tracker=tracker
+                )
+
+        if override_dict:
+            override_prompt_block = agente_extrator.formatar_override_para_prompt(override_dict)
+            diretrizes = f"{override_prompt_block}\n\n{diretrizes}"
 
         conteudo_bruto = gerador_conteudo.gerar_conteudo_aula(
             nome_professor="Professor UFBA",
