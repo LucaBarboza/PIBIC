@@ -4,7 +4,7 @@ from typing import Optional, Dict
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
-from schemas import RegraOverride
+from schemas import RegraOverride, MaterialBaseExtraido
 from client_factory import get_genai_client
 
 load_dotenv()
@@ -138,7 +138,11 @@ Produza um texto denso, rico, completo e detalhado em português que servirá de
         def chamar_extrator_material():
             return client.models.generate_content(
                 model=modelo_alvo,
-                contents=[pdf_part, prompt]
+                contents=[pdf_part, prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=MaterialBaseExtraido
+                )
             )
             
         resposta = executar_chamada_com_retry(
@@ -146,16 +150,22 @@ Produza um texto denso, rico, completo e detalhado em português que servirá de
             max_retries=4,
             logger=logger,
             nome_agente="Extrator PDF Material",
-            descricao=f"leitura multimodal do PDF {nome_arq}",
+            descricao=f"leitura multimodal estruturada do PDF {nome_arq}",
             tracker=tracker,
             modelo=modelo_alvo
         )
         
         if resposta and resposta.text:
+            try:
+                dados_dict = json.loads(resposta.text)
+                texto_formatado = formatar_material_base_para_prompt(dados_dict)
+            except Exception:
+                texto_formatado = resposta.text.strip()
+                
             if logger:
-                logger.log(f"Agente Extrator (IA): PDF '{nome_arq}' lido e estruturado com sucesso!", "success")
-            print(f" [OK] Agente Extrator processou '{nome_arq}' com sucesso ({len(resposta.text)} caracteres extraídos).")
-            return resposta.text.strip()
+                logger.log(f"Agente Extrator (IA): PDF '{nome_arq}' lido e estruturado com sucesso (Schema MaterialBaseExtraido)!", "success")
+            print(f" [OK] Agente Extrator processou '{nome_arq}' com sucesso via JSON estruturado ({len(texto_formatado)} caracteres).")
+            return texto_formatado
             
     except Exception as e:
         print(f"[ERRO] Falha no Agente Extrator ao ler PDF com IA: {e}")
@@ -276,4 +286,50 @@ def formatar_override_para_prompt(override_dict: dict) -> str:
         linhas.append(f"\nOUTRAS DIRETRIZES E INSTRUÇÕES ESPECÍFICAS:\n  - {outras.strip()}")
         
     linhas.append("\n[FIM DO OVERRIDE DE DIRETRIZES DO PROFESSOR]\n")
+    return "\n".join(linhas)
+
+def formatar_material_base_para_prompt(mat: dict) -> str:
+    """
+    Converte o dicionário MaterialBaseExtraido em um bloco estruturado rico e detalhado
+    para alimentar com máxima fidelidade os micro-agentes de redação.
+    """
+    if not mat or not isinstance(mat, dict):
+        return ""
+        
+    linhas = ["[MATERIAL DE APOIO DO PROFESSOR - ESTRUTURADO VIA IA COM MÁXIMA FIDELIDADE]"]
+    
+    if mat.get("titulo_ou_tema"):
+        linhas.append(f"\nTEMA / ASSUNTO DO MATERIAL:\n  {mat['titulo_ou_tema']}")
+        
+    if mat.get("visao_geral_pedagogica"):
+        linhas.append(f"\nVISÃO GERAL PEDAGÓGICA DO PROFESSOR:\n  {mat['visao_geral_pedagogica']}")
+        
+    topicos = mat.get("sequencia_topicos")
+    if topicos and isinstance(topicos, list) and len(topicos) > 0:
+        linhas.append("\nSEQUÊNCIA OBRIGATÓRIA DE TÓPICOS E CONCEITOS:")
+        for t in topicos:
+            linhas.append(f"  - {t}")
+            
+    formulas = mat.get("formulas_e_definicoes_latex")
+    if formulas and isinstance(formulas, list) and len(formulas) > 0:
+        linhas.append("\nFÓRMULAS, DEFINIÇÕES E TEOREMAS OBRIGATÓRIOS (EM LATEX RIGOROSO):")
+        for f in formulas:
+            linhas.append(f"  - {f}")
+            
+    exemplos = mat.get("exemplos_e_exercicios")
+    if exemplos and isinstance(exemplos, list) and len(exemplos) > 0:
+        linhas.append("\nEXEMPLOS PRÁTICOS E EXERCÍCIOS PRESENTES NAS NOTAS:")
+        for ex in exemplos:
+            linhas.append(f"  - {ex}")
+            
+    convencoes = mat.get("convencoes_e_notacoes")
+    if convencoes and isinstance(convencoes, list) and len(convencoes) > 0:
+        linhas.append("\nCONVENÇÕES DE NOTAÇÃO E TERMOS TÉCNICOS ESPECÍFICOS:")
+        for c in convencoes:
+            linhas.append(f"  - {c}")
+            
+    if mat.get("conteudo_didatico_completo"):
+        linhas.append(f"\nCONTEÚDO CONCEITUAL E DIDÁTICO DETALHADO:\n{mat['conteudo_didatico_completo']}")
+        
+    linhas.append("\n[FIM DO MATERIAL DE APOIO DO PROFESSOR]\n")
     return "\n".join(linhas)

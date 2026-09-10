@@ -31,6 +31,15 @@ class RegraOverride(BaseModel):
         description="Anotações gerais e contextuais extraídas do documento."
     )
 
+class MaterialBaseExtraido(BaseModel):
+    titulo_ou_tema: str = Field(description="Título ou tema central identificado no documento.")
+    visao_geral_pedagogica: str = Field(description="Resumo pedagógico e didático da abordagem do professor para esta aula.")
+    sequencia_topicos: List[str] = Field(description="Sequência de assuntos e tópicos na ordem exata apresentada pelo professor.")
+    formulas_e_definicoes_latex: List[str] = Field(description="Todas as fórmulas, teoremas e definições matemáticas rigorosamente em LaTeX ($ ou $$).")
+    exemplos_e_exercicios: List[str] = Field(description="Exemplos numéricos, problemas e passos aritméticos presentes nas notas.")
+    convencoes_e_notacoes: List[str] = Field(description="Convenções de notação e termos técnicos utilizados pelo professor.")
+    conteudo_didatico_completo: str = Field(description="Texto denso e completo articulando todo o conteúdo conceitual e didático para orientar a redação da aula.")
+
 # ==========================================
 # SCHEMAS DO AGENTE 1 (ROTEIRISTA PEDAGÓGICO)
 # ==========================================
