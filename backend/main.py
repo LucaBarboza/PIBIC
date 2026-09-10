@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import re
 import io
+import shutil
 import firebase_admin
 from firebase_admin import credentials, firestore
 from pydantic import BaseModel
@@ -488,16 +489,18 @@ async def upload_pdf(
         caminho_destino = os.path.join(UPLOAD_DIR, arquivo_id)
         
         try:
-            conteudo = await f.read()
-            if not conteudo:
-                continue
             with open(caminho_destino, "wb") as buffer:
-                buffer.write(conteudo)
+                shutil.copyfileobj(f.file, buffer)
+            tamanho = os.path.getsize(caminho_destino)
+            if tamanho == 0:
+                if os.path.exists(caminho_destino):
+                    os.remove(caminho_destino)
+                continue
                 
             salvos.append({
                 "id": arquivo_id,
                 "nome": f.filename,
-                "tamanho_bytes": len(conteudo),
+                "tamanho_bytes": tamanho,
                 "caminho": caminho_destino
             })
         except Exception as e:

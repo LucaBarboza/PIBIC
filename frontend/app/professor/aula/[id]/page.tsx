@@ -221,6 +221,13 @@ function BlockEditor({
   );
 }
 
+function formatFileSize(bytes: number): string {
+  if (!bytes || isNaN(bytes)) return "";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
 export default function ProfessorSemesterViewer() {
   const params = useParams();
   const router = useRouter();
@@ -245,42 +252,76 @@ export default function ProfessorSemesterViewer() {
   const [novaAulaPdf, setNovaAulaPdf] = useState("");
   const [novaAulaArquivoId, setNovaAulaArquivoId] = useState("");
   const [novaAulaNomeArquivo, setNovaAulaNomeArquivo] = useState("");
+  const [novaAulaTamanhoArquivo, setNovaAulaTamanhoArquivo] = useState("");
+  const [novaAulaSyncing, setNovaAulaSyncing] = useState(false);
+  const [novaAulaUploadError, setNovaAulaUploadError] = useState(false);
   const [novaAulaGerarExercicios, setNovaAulaGerarExercicios] = useState(true);
   const [novaAulaSugestoesExercicios, setNovaAulaSugestoesExercicios] = useState("");
   const [novaAulaGerarSimulador, setNovaAulaGerarSimulador] = useState(true);
   const [novaAulaSugestoesSimulador, setNovaAulaSugestoesSimulador] = useState("");
-  const [uploadingNovaAula, setUploadingNovaAula] = useState(false);
   const [modalSucessoOpen, setModalSucessoOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadNovaAulaPromiseRef = useRef<Promise<any> | null>(null);
 
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = (file: File) => {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".pdf")) return alert("Somente PDF");
-    setUploadingNovaAula(true);
+    if (!file.name.toLowerCase().endsWith(".pdf")) return alert("Somente arquivos PDF são aceitos.");
+
+    // 0ms feedback instantâneo no frontend
+    setNovaAulaNomeArquivo(file.name);
+    setNovaAulaTamanhoArquivo(formatFileSize(file.size));
+    setNovaAulaSyncing(true);
+    setNovaAulaUploadError(false);
+    setNovaAulaArquivoId("");
+    setNovaAulaPdf("");
+
     const formData = new FormData();
     formData.append("files", file);
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (res.ok) {
-        setNovaAulaPdf(data.texto_extraido || (data.arquivo_id ? `[PDF_ID:${data.arquivo_id}]` : ""));
-        setNovaAulaArquivoId(data.arquivo_id || "");
-        setNovaAulaNomeArquivo(file.name);
-      } else {
-        alert("Erro no upload: " + (data.detail || "Falha ao enviar arquivo"));
+
+    const p = (async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
+        const data = await res.json();
+        if (res.ok) {
+          setNovaAulaPdf(data.texto_extraido || (data.arquivo_id ? `[PDF_ID:${data.arquivo_id}]` : ""));
+          setNovaAulaArquivoId(data.arquivo_id || "");
+          setNovaAulaSyncing(false);
+        } else {
+          console.error("Erro no upload do PDF:", data.detail);
+          setNovaAulaSyncing(false);
+          setNovaAulaUploadError(true);
+        }
+      } catch (e) {
+        console.error("Erro de rede no upload:", e);
+        setNovaAulaSyncing(false);
+        setNovaAulaUploadError(true);
       }
-    } catch (e) {
-      alert("Erro na rede");
-    } finally {
-      setUploadingNovaAula(false);
+    })();
+
+    uploadNovaAulaPromiseRef.current = p;
+  };
+
+  const handleRemoveArquivoNovaAula = () => {
+    uploadNovaAulaPromiseRef.current = null;
+    setNovaAulaNomeArquivo("");
+    setNovaAulaTamanhoArquivo("");
+    setNovaAulaPdf("");
+    setNovaAulaArquivoId("");
+    setNovaAulaSyncing(false);
+    setNovaAulaUploadError(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
   const handleCriarAulaAvulsa = async () => {
     if (!novaAulaTitulo) return alert("Título é obrigatório");
     try {
+      if (uploadNovaAulaPromiseRef.current) {
+        await uploadNovaAulaPromiseRef.current;
+      }
       const nextNum = (classroom?.total_aulas || classroom?.cronograma_oficial?.length || 0) + 1;
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       await fetch(`${apiUrl}/api/gerar_aula_avulsa`, {
@@ -308,6 +349,10 @@ export default function ProfessorSemesterViewer() {
       setNovaAulaPdf("");
       setNovaAulaArquivoId("");
       setNovaAulaNomeArquivo("");
+      setNovaAulaTamanhoArquivo("");
+      setNovaAulaSyncing(false);
+      setNovaAulaUploadError(false);
+      uploadNovaAulaPromiseRef.current = null;
       setModalSucessoOpen(true);
     } catch (e) {
       alert("Erro ao criar nova aula");
@@ -551,13 +596,45 @@ export default function ProfessorSemesterViewer() {
                 <div>
                   <label className="block text-sm font-bold text-slate-800 mb-1">Upload de Material Base (PDF Opcional)</label>
                   <input type="file" ref={fileInputRef} className="hidden" onChange={e => e.target.files && handleFileUpload(e.target.files[0])} accept=".pdf" />
-                  <button onClick={() => fileInputRef.current?.click()} className="bg-slate-50 border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold px-4 py-3 rounded-lg text-sm w-full transition" disabled={uploadingNovaAula}>
-                    {uploadingNovaAula ? "Enviando..." : "📎 Anexar PDF Específico"}
-                  </button>
-                  {novaAulaPdf && (
-                    <p className="text-green-700 text-xs mt-2 font-bold bg-green-50 p-2 rounded border border-green-200">
-                      ✓ {novaAulaNomeArquivo || "PDF anexado"} <span className="text-slate-400 font-normal">(IA analisará em background)</span>
-                    </p>
+                  {!novaAulaNomeArquivo ? (
+                    <button 
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()} 
+                      className="bg-slate-50 border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold px-4 py-3 rounded-lg text-sm w-full transition flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <span>📎</span> Anexar PDF Específico
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm shadow-sm">
+                      <div className="flex items-center gap-2.5 overflow-hidden mr-2">
+                        <span className="text-lg">📄</span>
+                        <div className="truncate text-left">
+                          <span className="font-bold text-blue-900 truncate block text-xs sm:text-sm">{novaAulaNomeArquivo}</span>
+                          <div className="flex items-center gap-1.5 text-[11px] text-blue-600">
+                            {novaAulaTamanhoArquivo && <span>{novaAulaTamanhoArquivo}</span>}
+                            <span>•</span>
+                            {novaAulaSyncing ? (
+                              <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                                Sincronizando em background...
+                              </span>
+                            ) : novaAulaUploadError ? (
+                              <span className="text-red-500 font-semibold">Falha no envio</span>
+                            ) : (
+                              <span className="text-emerald-700 font-semibold">✓ Anexado (IA analisará em background)</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveArquivoNovaAula}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition font-bold"
+                        title="Remover arquivo"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   )}
                 </div>
 

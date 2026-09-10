@@ -7,6 +7,13 @@ import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore
 import { onAuthStateChanged } from "firebase/auth";
 import DisciplinaSelect from "@/components/DisciplinaSelect";
 
+function formatFileSize(bytes: number): string {
+  if (!bytes || isNaN(bytes)) return "";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
 export default function CriarSalaPersonalizada() {
   const router = useRouter();
   
@@ -31,7 +38,6 @@ export default function CriarSalaPersonalizada() {
     setExpandedBlocks(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  
   // Magic Mode Settings
   const [modoAulas, setModoAulas] = useState<"padrao" | "auto" | "manual">("padrao");
   const [qtdManual, setQtdManual] = useState<number>(30);
@@ -41,6 +47,15 @@ export default function CriarSalaPersonalizada() {
   const [arquivoGlobalPdf, setArquivoGlobalPdf] = useState("");
   const [arquivoGlobalNome, setArquivoGlobalNome] = useState("");
   const globalPdfRef = useRef<HTMLInputElement>(null);
+
+  // Uploads state ref para garantir sincronização silenciosa e aguardar caso clique em submeter
+  const uploadsStateRef = useRef<{
+    [key: string]: {
+      arquivo_id?: string;
+      texto_extraido?: string;
+      promise?: Promise<any>;
+    };
+  }>({});
 
   // Blocos Manuais (Quando for Artesão)
   const [aulasManuais, setAulasManuais] = useState<any[]>([{
@@ -53,8 +68,12 @@ export default function CriarSalaPersonalizada() {
     arquivo_notacoes_id: "",
     nome_arquivo: "",
     nome_arquivo_notacoes: "",
-    uploading: false,
-    uploading_notacoes: false,
+    tamanho_arquivo: "",
+    tamanho_arquivo_notacoes: "",
+    syncing: false,
+    syncing_notacoes: false,
+    upload_error: false,
+    upload_notacoes_error: false,
     gerar_exercicios: true,
     sugestoes_exercicios: "",
     gerar_simulador: true,
@@ -79,108 +98,226 @@ export default function CriarSalaPersonalizada() {
     loadDisciplinas();
   }, []);
 
-  const handleGlobalFileUpload = async (files: FileList | null) => {
+  const handleGlobalFileUpload = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setUploadingGlobal(true);
     
-    const formData = new FormData();
-    let validFilesCount = 0;
-    
+    const validFiles: File[] = [];
     for (let i = 0; i < files.length; i++) {
-        if (files[i].name.toLowerCase().endsWith(".pdf")) {
-            formData.append("files", files[i]);
-            validFilesCount++;
+      if (files[i].name.toLowerCase().endsWith(".pdf")) {
+        validFiles.push(files[i]);
+      }
+    }
+    
+    if (validFiles.length === 0) {
+      alert("Somente arquivos PDF são suportados.");
+      return;
+    }
+
+    const totalBytes = validFiles.reduce((acc, f) => acc + f.size, 0);
+    const sizeStr = formatFileSize(totalBytes);
+    const namesStr = validFiles.length === 1 ? validFiles[0].name : `${validFiles.length} arquivos (${sizeStr})`;
+    
+    // Imediato (0ms)
+    setArquivoGlobalNome(namesStr);
+    setUploadingGlobal(true);
+
+    const formData = new FormData();
+    validFiles.forEach(f => formData.append("files", f));
+
+    const p = (async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
+        const data = await res.json();
+        if (res.ok) {
+          const arqId = data.arquivo_id || "";
+          const txt = data.texto_extraido || (arqId ? `[PDF_ID:${arqId}]` : "");
+          uploadsStateRef.current["global"] = { arquivo_id: arqId, texto_extraido: txt };
+          setArquivoGlobalPdf(txt);
+        } else {
+          console.error("Erro no upload global:", data.detail);
         }
-    }
-    
-    if (validFilesCount === 0) {
-        alert("Somente arquivos PDF são suportados.");
+      } catch (e) {
+        console.error("Erro de rede no upload global:", e);
+      } finally {
         setUploadingGlobal(false);
-        return;
-    }
-
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (res.ok) {
-        setArquivoGlobalPdf(data.texto_extraido || (data.arquivo_id ? `[PDF_ID:${data.arquivo_id}]` : ""));
-        setArquivoGlobalNome(`✓ ${validFilesCount} arquivo(s) anexado(s) (IA analisará em background)`);
-      } else {
-        alert("Erro no upload: " + (data.detail || "Falha ao enviar"));
       }
-    } catch (e) {
-      alert("Erro de rede");
-    } finally {
-      setUploadingGlobal(false);
+    })();
+
+    uploadsStateRef.current["global"] = { promise: p };
+  };
+
+  const handleRemoveGlobalFile = () => {
+    delete uploadsStateRef.current["global"];
+    setArquivoGlobalNome("");
+    setArquivoGlobalPdf("");
+    setUploadingGlobal(false);
+    if (globalPdfRef.current) {
+      globalPdfRef.current.value = "";
     }
   };
 
-  const handleBlocoFileUpload = async (index: number, file: File) => {
+  const handleBlocoFileUpload = (index: number, file: File) => {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".pdf")) return alert("Somente arquivos PDF.");
     
+    const blocoId = aulasManuais[index]?.id;
+    const key = `base_${blocoId}`;
+
+    // Imediato (0ms)
     const updated = [...aulasManuais];
-    updated[index].uploading = true;
+    updated[index].nome_arquivo = file.name;
+    updated[index].tamanho_arquivo = formatFileSize(file.size);
+    updated[index].syncing = true;
+    updated[index].upload_error = false;
     setAulasManuais(updated);
 
     const formData = new FormData();
     formData.append("files", file);
 
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
-      const data = await res.json();
-      const nextUpdated = [...aulasManuais];
-      
-      if (res.ok) {
-        nextUpdated[index].texto_base_pdf = data.texto_extraido || (data.arquivo_id ? `[PDF_ID:${data.arquivo_id}]` : "");
-        nextUpdated[index].arquivo_base_id = data.arquivo_id || "";
-        nextUpdated[index].nome_arquivo = file.name;
-      } else {
-        alert("Erro no upload: " + (data.detail || "Falha ao enviar"));
+    const p = (async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
+        const data = await res.json();
+        if (res.ok) {
+          const arqId = data.arquivo_id || "";
+          const txt = data.texto_extraido || (arqId ? `[PDF_ID:${arqId}]` : "");
+          uploadsStateRef.current[key] = { arquivo_id: arqId, texto_extraido: txt };
+          setAulasManuais(prev => {
+            const next = [...prev];
+            const target = next.find(b => b.id === blocoId);
+            if (target && target.nome_arquivo === file.name) {
+              target.arquivo_base_id = arqId;
+              target.texto_base_pdf = txt;
+              target.syncing = false;
+            }
+            return next;
+          });
+        } else {
+          console.error("Erro upload:", data.detail);
+          setAulasManuais(prev => {
+            const next = [...prev];
+            const target = next.find(b => b.id === blocoId);
+            if (target && target.nome_arquivo === file.name) {
+              target.syncing = false;
+              target.upload_error = true;
+            }
+            return next;
+          });
+        }
+      } catch (e) {
+        console.error("Erro de rede:", e);
+        setAulasManuais(prev => {
+          const next = [...prev];
+          const target = next.find(b => b.id === blocoId);
+          if (target && target.nome_arquivo === file.name) {
+            target.syncing = false;
+            target.upload_error = true;
+          }
+          return next;
+        });
       }
-      nextUpdated[index].uploading = false;
-      setAulasManuais(nextUpdated);
-    } catch (e) {
-      alert("Erro na rede ao enviar PDF");
-      const nextUpdated = [...aulasManuais];
-      nextUpdated[index].uploading = false;
-      setAulasManuais(nextUpdated);
+    })();
+
+    uploadsStateRef.current[key] = { promise: p };
+  };
+
+  const handleRemoveBlocoFile = (index: number) => {
+    const blocoId = aulasManuais[index]?.id;
+    delete uploadsStateRef.current[`base_${blocoId}`];
+    const updated = [...aulasManuais];
+    updated[index].nome_arquivo = "";
+    updated[index].tamanho_arquivo = "";
+    updated[index].arquivo_base_id = "";
+    updated[index].texto_base_pdf = "";
+    updated[index].syncing = false;
+    updated[index].upload_error = false;
+    setAulasManuais(updated);
+    if (fileInputRefs.current[blocoId]) {
+      fileInputRefs.current[blocoId].value = "";
     }
   };
 
-  const handleNotacoesFileUpload = async (index: number, file: File) => {
+  const handleNotacoesFileUpload = (index: number, file: File) => {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".pdf")) return alert("Somente arquivos PDF.");
     
+    const blocoId = aulasManuais[index]?.id;
+    const key = `notacoes_${blocoId}`;
+
+    // Imediato (0ms)
     const updated = [...aulasManuais];
-    updated[index].uploading_notacoes = true;
+    updated[index].nome_arquivo_notacoes = file.name;
+    updated[index].tamanho_arquivo_notacoes = formatFileSize(file.size);
+    updated[index].syncing_notacoes = true;
+    updated[index].upload_notacoes_error = false;
     setAulasManuais(updated);
 
     const formData = new FormData();
     formData.append("files", file);
 
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
-      const data = await res.json();
-      const nextUpdated = [...aulasManuais];
-      
-      if (res.ok) {
-        nextUpdated[index].texto_base_notacoes = data.texto_extraido || (data.arquivo_id ? `[PDF_ID:${data.arquivo_id}]` : "");
-        nextUpdated[index].arquivo_notacoes_id = data.arquivo_id || "";
-        nextUpdated[index].nome_arquivo_notacoes = file.name;
-      } else {
-        alert("Erro no upload: " + (data.detail || "Falha ao enviar"));
+    const p = (async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
+        const data = await res.json();
+        if (res.ok) {
+          const arqId = data.arquivo_id || "";
+          const txt = data.texto_extraido || (arqId ? `[PDF_ID:${arqId}]` : "");
+          uploadsStateRef.current[key] = { arquivo_id: arqId, texto_extraido: txt };
+          setAulasManuais(prev => {
+            const next = [...prev];
+            const target = next.find(b => b.id === blocoId);
+            if (target && target.nome_arquivo_notacoes === file.name) {
+              target.arquivo_notacoes_id = arqId;
+              target.texto_base_notacoes = txt;
+              target.syncing_notacoes = false;
+            }
+            return next;
+          });
+        } else {
+          console.error("Erro upload:", data.detail);
+          setAulasManuais(prev => {
+            const next = [...prev];
+            const target = next.find(b => b.id === blocoId);
+            if (target && target.nome_arquivo_notacoes === file.name) {
+              target.syncing_notacoes = false;
+              target.upload_notacoes_error = true;
+            }
+            return next;
+          });
+        }
+      } catch (e) {
+        console.error("Erro de rede:", e);
+        setAulasManuais(prev => {
+          const next = [...prev];
+          const target = next.find(b => b.id === blocoId);
+          if (target && target.nome_arquivo_notacoes === file.name) {
+            target.syncing_notacoes = false;
+            target.upload_notacoes_error = true;
+          }
+          return next;
+        });
       }
-      nextUpdated[index].uploading_notacoes = false;
-      setAulasManuais(nextUpdated);
-    } catch (e) {
-      alert("Erro na rede ao enviar PDF");
-      const nextUpdated = [...aulasManuais];
-      nextUpdated[index].uploading_notacoes = false;
-      setAulasManuais(nextUpdated);
+    })();
+
+    uploadsStateRef.current[key] = { promise: p };
+  };
+
+  const handleRemoveNotacoesFile = (index: number) => {
+    const blocoId = aulasManuais[index]?.id;
+    delete uploadsStateRef.current[`notacoes_${blocoId}`];
+    const updated = [...aulasManuais];
+    updated[index].nome_arquivo_notacoes = "";
+    updated[index].tamanho_arquivo_notacoes = "";
+    updated[index].arquivo_notacoes_id = "";
+    updated[index].texto_base_notacoes = "";
+    updated[index].syncing_notacoes = false;
+    updated[index].upload_notacoes_error = false;
+    setAulasManuais(updated);
+    if (fileInputRefsNotacoes.current[blocoId]) {
+      fileInputRefsNotacoes.current[blocoId].value = "";
     }
   };
 
@@ -195,8 +332,12 @@ export default function CriarSalaPersonalizada() {
       arquivo_notacoes_id: "",
       nome_arquivo: "",
       nome_arquivo_notacoes: "",
-      uploading: false,
-      uploading_notacoes: false,
+      tamanho_arquivo: "",
+      tamanho_arquivo_notacoes: "",
+      syncing: false,
+      syncing_notacoes: false,
+      upload_error: false,
+      upload_notacoes_error: false,
       gerar_exercicios: true,
       sugestoes_exercicios: "",
       gerar_simulador: true,
@@ -206,6 +347,9 @@ export default function CriarSalaPersonalizada() {
 
   const removeBloco = (index: number) => {
     if (aulasManuais.length === 1) return;
+    const blocoId = aulasManuais[index]?.id;
+    delete uploadsStateRef.current[`base_${blocoId}`];
+    delete uploadsStateRef.current[`notacoes_${blocoId}`];
     const updated = [...aulasManuais];
     updated.splice(index, 1);
     setAulasManuais(updated);
@@ -223,6 +367,14 @@ export default function CriarSalaPersonalizada() {
     setSubmitting(true);
     
     try {
+      // Se houver uploads ainda sincronizando em background, aguarda todos concluírem
+      const pendingPromises = Object.values(uploadsStateRef.current)
+        .map(u => u.promise)
+        .filter(Boolean);
+      if (pendingPromises.length > 0) {
+        await Promise.all(pendingPromises);
+      }
+
       const code = Math.floor(1000 + Math.random() * 9000).toString();
       const disc = disciplinas.find(d => d.id_disciplina === selectedDisciplina);
       
@@ -255,18 +407,32 @@ export default function CriarSalaPersonalizada() {
           }
       }
 
-      const formattedBlocos = isBlocoABloco ? aulasManuais.map(a => ({
+      const formattedBlocos = isBlocoABloco ? aulasManuais.map(a => {
+        const baseUpload = uploadsStateRef.current[`base_${a.id}`];
+        const notacoesUpload = uploadsStateRef.current[`notacoes_${a.id}`];
+
+        const arqBaseId = baseUpload?.arquivo_id || a.arquivo_base_id || "";
+        const txtBase = baseUpload?.texto_extraido || a.texto_base_pdf || (arqBaseId ? `[PDF_ID:${arqBaseId}]` : "");
+
+        const arqNotId = notacoesUpload?.arquivo_id || a.arquivo_notacoes_id || "";
+        const txtNot = notacoesUpload?.texto_extraido || a.texto_base_notacoes || (arqNotId ? `[PDF_ID:${arqNotId}]` : "");
+
+        return {
           titulo: a.titulo || "Sem título",
           descricao: a.descricao + (a.gerar_exercicios && a.sugestoes_exercicios ? `\n(Dica p/ Exercícios: ${a.sugestoes_exercicios})` : "") + (a.gerar_simulador && a.sugestoes_simulador ? `\n(Dica p/ Simulador: ${a.sugestoes_simulador})` : ""),
-          texto_base_pdf: a.texto_base_pdf || "",
-          texto_base_notacoes: a.texto_base_notacoes || "",
-          arquivo_base_id: a.arquivo_base_id || "",
-          arquivo_notacoes_id: a.arquivo_notacoes_id || "",
+          texto_base_pdf: txtBase,
+          texto_base_notacoes: txtNot,
+          arquivo_base_id: arqBaseId,
+          arquivo_notacoes_id: arqNotId,
           nome_arquivo: a.nome_arquivo || "",
           nome_arquivo_notacoes: a.nome_arquivo_notacoes || "",
           gerar_exercicios: a.gerar_exercicios,
           gerar_simulador: a.gerar_simulador
-      })) : [];
+        };
+      }) : [];
+
+      const globalUpload = uploadsStateRef.current["global"];
+      const globalPdfPayload = globalUpload?.texto_extraido || (globalUpload?.arquivo_id ? `[PDF_ID:${globalUpload.arquivo_id}]` : arquivoGlobalPdf);
 
       const payload = {
         id_sala: docRef.id,
@@ -278,7 +444,7 @@ export default function CriarSalaPersonalizada() {
         tipo_carga_horaria: payloadTipoCarga,
         permitir_aprofundamento: false, // Default desativado
         tipo_crie_seu_jeito: isBlocoABloco ? "bloco_a_bloco" : "automatico",
-        arquivo_global_pdf: isBlocoABloco ? "" : arquivoGlobalPdf,
+        arquivo_global_pdf: isBlocoABloco ? "" : globalPdfPayload,
         aulas_manuais: formattedBlocos,
         modelo_llm: modeloLlm
       };
@@ -370,14 +536,33 @@ export default function CriarSalaPersonalizada() {
                     <p className="text-slate-500 mb-6 max-w-lg mx-auto">Anexe seus materiais, anotações ou livros em PDF. A IA lerá tudo e moldará as aulas automaticamente baseada nisso.</p>
                     
                     <input type="file" ref={globalPdfRef} className="hidden" accept=".pdf" multiple onChange={e => handleGlobalFileUpload(e.target.files)} />
-                    <button 
-                        onClick={() => globalPdfRef.current?.click()}
-                        className="bg-slate-800 text-white px-8 py-3 rounded-full font-bold shadow-md hover:bg-slate-700 transition"
-                        disabled={uploadingGlobal}
-                    >
-                        {uploadingGlobal ? "Enviando..." : "📎 Anexar Múltiplos PDFs"}
-                    </button>
-                    {arquivoGlobalNome && <p className="text-green-600 mt-4 font-bold bg-green-50 inline-block px-4 py-2 rounded-full border border-green-200">✓ {arquivoGlobalNome}</p>}
+                    {!arquivoGlobalNome ? (
+                        <button 
+                            type="button"
+                            onClick={() => globalPdfRef.current?.click()}
+                            className="bg-slate-800 text-white px-8 py-3 rounded-full font-bold shadow-md hover:bg-slate-700 transition"
+                        >
+                            📎 Anexar Múltiplos PDFs
+                        </button>
+                    ) : (
+                        <div className="inline-flex items-center gap-3 bg-green-50 border border-green-200 px-5 py-2.5 rounded-full text-green-800 text-sm font-bold shadow-sm">
+                            <span>✓ {arquivoGlobalNome}</span>
+                            {uploadingGlobal && (
+                                <span className="text-xs text-amber-600 font-normal inline-flex items-center gap-1.5 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                                    sincronizando...
+                                </span>
+                            )}
+                            <button
+                                type="button"
+                                onClick={handleRemoveGlobalFile}
+                                className="text-slate-400 hover:text-red-600 hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center transition font-bold"
+                                title="Remover arquivos"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
 
                     <div className="mt-12 text-left border-t border-slate-200 pt-8">
                         <h3 className="text-lg font-bold text-slate-800 mb-4">Quantidade de Aulas do Semestre</h3>
@@ -437,22 +622,50 @@ export default function CriarSalaPersonalizada() {
                                     <div className="flex items-center gap-2">
                                         <input 
                                             type="file" accept=".pdf" className="hidden"
-                                            ref={el => { fileInputRefs.current[idx] = el; }}
+                                            ref={el => { fileInputRefs.current[bloco.id] = el; }}
                                             onChange={(e) => { if (e.target.files && e.target.files[0]) handleBlocoFileUpload(idx, e.target.files[0]); }}
                                         />
-                                        <button 
-                                            onClick={() => fileInputRefs.current[idx]?.click()}
-                                            className="bg-slate-50 border border-slate-300 text-slate-700 px-4 py-3 rounded-lg text-sm font-bold hover:bg-slate-100 flex-1 flex justify-center items-center transition shadow-sm"
-                                            disabled={bloco.uploading}
-                                        >
-                                            {bloco.uploading ? "Enviando PDF..." : "📎 Escolher PDF Específico"}
-                                        </button>
+                                        {!bloco.nome_arquivo ? (
+                                            <button 
+                                                type="button"
+                                                onClick={() => fileInputRefs.current[bloco.id]?.click()}
+                                                className="bg-slate-50 border border-slate-300 text-slate-700 px-4 py-3 rounded-lg text-sm font-bold hover:bg-slate-100 flex-1 flex justify-center items-center gap-2 transition shadow-sm"
+                                            >
+                                                <span>📎</span> Escolher PDF Específico
+                                            </button>
+                                        ) : (
+                                            <div className="flex-1 flex items-center justify-between p-2.5 px-3 bg-blue-50 border border-blue-200 rounded-lg text-sm shadow-sm">
+                                                <div className="flex items-center gap-2.5 overflow-hidden mr-2">
+                                                    <span className="text-lg">📄</span>
+                                                    <div className="truncate text-left">
+                                                        <span className="font-bold text-blue-900 truncate block text-xs sm:text-sm">{bloco.nome_arquivo}</span>
+                                                        <div className="flex items-center gap-1.5 text-[11px] text-blue-600">
+                                                            {bloco.tamanho_arquivo && <span>{bloco.tamanho_arquivo}</span>}
+                                                            <span>•</span>
+                                                            {bloco.syncing ? (
+                                                                <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                                                                    Sincronizando em background...
+                                                                </span>
+                                                            ) : bloco.upload_error ? (
+                                                                <span className="text-red-500 font-semibold">Falha no envio</span>
+                                                            ) : (
+                                                                <span className="text-emerald-700 font-semibold">✓ Anexado (IA analisará em background)</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveBlocoFile(idx)}
+                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition font-bold"
+                                                    title="Remover arquivo"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
-                                    {bloco.nome_arquivo && (
-                                        <p className="text-xs text-green-600 mt-2 font-bold px-2">
-                                            ✓ {bloco.nome_arquivo} <span className="text-slate-400 font-normal">(IA analisará em background)</span>
-                                        </p>
-                                    )}
                                 </div>
                             </div>
                             
@@ -487,20 +700,47 @@ export default function CriarSalaPersonalizada() {
                                                     ref={el => { fileInputRefsNotacoes.current[bloco.id] = el; }}
                                                     onChange={(e) => { if (e.target.files && e.target.files[0]) handleNotacoesFileUpload(idx, e.target.files[0]); }}
                                                 />
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => fileInputRefsNotacoes.current[bloco.id]?.click()}
-                                                    className="bg-white border border-slate-300 text-slate-700 px-4 py-3 rounded-lg text-sm font-bold hover:bg-slate-100 flex-1 flex justify-center items-center transition shadow-sm"
-                                                    disabled={bloco.uploading_notacoes}
-                                                >
-                                                    {bloco.uploading_notacoes ? "Enviando PDF..." : "📎 Carregar PDF de Notações"}
-                                                </button>
+                                                {!bloco.nome_arquivo_notacoes ? (
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => fileInputRefsNotacoes.current[bloco.id]?.click()}
+                                                        className="bg-white border border-slate-300 text-slate-700 px-4 py-3 rounded-lg text-sm font-bold hover:bg-slate-100 flex-1 flex justify-center items-center gap-2 transition shadow-sm"
+                                                    >
+                                                        <span>📎</span> Carregar PDF de Notações
+                                                    </button>
+                                                ) : (
+                                                    <div className="flex-1 flex items-center justify-between p-2.5 px-3 bg-purple-50 border border-purple-200 rounded-lg text-sm shadow-sm">
+                                                        <div className="flex items-center gap-2.5 overflow-hidden mr-2">
+                                                            <span className="text-lg">📝</span>
+                                                            <div className="truncate text-left">
+                                                                <span className="font-bold text-purple-900 truncate block text-xs sm:text-sm">{bloco.nome_arquivo_notacoes}</span>
+                                                                <div className="flex items-center gap-1.5 text-[11px] text-purple-600">
+                                                                    {bloco.tamanho_arquivo_notacoes && <span>{bloco.tamanho_arquivo_notacoes}</span>}
+                                                                    <span>•</span>
+                                                                    {bloco.syncing_notacoes ? (
+                                                                        <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
+                                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                                                                            Sincronizando em background...
+                                                                        </span>
+                                                                    ) : bloco.upload_notacoes_error ? (
+                                                                        <span className="text-red-500 font-semibold">Falha no envio</span>
+                                                                    ) : (
+                                                                        <span className="text-emerald-700 font-semibold">✓ Anexado (IA analisará em background)</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveNotacoesFile(idx)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition font-bold"
+                                                            title="Remover arquivo de notações"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
-                                            {bloco.nome_arquivo_notacoes && (
-                                                <p className="text-xs text-green-600 mt-2 font-bold px-2">
-                                                    ✓ {bloco.nome_arquivo_notacoes} <span className="text-slate-400 font-normal">(IA analisará em background)</span>
-                                                </p>
-                                            )}
                                         </div>
 
 
