@@ -609,6 +609,8 @@ def processar_aula_avulsa_background(req: AulaAvulsaRequest):
                     modelo_llm=req.modelo_llm, 
                     diretrizes_override=override_prompt_block, 
                     logger=logger,
+                    flag_exercicios=req.aula_manual.gerar_exercicios,
+                    flag_simulador=req.aula_manual.gerar_simulador,
                     tracker=tracker
                 )
 

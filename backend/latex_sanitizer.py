@@ -4,11 +4,16 @@ def sanitize_display_math(content: str) -> str:
     """Sanitiza o conteúdo interno de um bloco de Display Math ($$...$$)."""
     c = content.strip()
     
-    # 1. Converte ambientes incompatíveis com o rehype-katex
+    # 1. Remove qualquer cifrão interno ($), pois no KaTeX é terminantemente proibido $ dentro de $$
+    c = c.replace('$', '')
+    
+    # 2. Converte ambientes incompatíveis com o rehype-katex
     c = re.sub(r'\\begin\{(align\*?|equation\*?|gather\*?|split\*?)\}', r'\\begin{aligned}', c)
     c = re.sub(r'\\end\{(align\*?|equation\*?|gather\*?|split\*?)\}', r'\\end{aligned}', c)
     
-    # 2. Converte macros incompatíveis e limpa chaves escapadas
+    # 3. Converte macros incompatíveis e comandos inexistentes
+    c = re.sub(r'\\hat\{\\Y\}', r'\\hat{Y}', c)
+    c = re.sub(r'\\Y(?=[_^\s\{\}\)])', r'Y', c)
     c = re.sub(r'\\bm\{', r'\\boldsymbol{', c)
     c = re.sub(r'\\bold\{', r'\\mathbf{', c)
     c = re.sub(r'\\+boldsymbol\\+\{([^}]+)\}', r'\\boldsymbol{\1}', c)
@@ -17,25 +22,32 @@ def sanitize_display_math(content: str) -> str:
     c = re.sub(r'(\t|\\+)hicksim', r'\\sim', c)
     c = re.sub(r'\\+nginxed', r'\\in', c)
     
-    # 3. Converte moedas dentro do math
+    # 4. Corrige chaves fechadas com escape indevido em subscritos, \text{...}\} ou \frac{...}\}
+    c = re.sub(r'([_^])\\\{', r'\1{', c)
+    c = re.sub(r'\\text\{([^}]+)\\\}', r'\\text{\1}', c)
+    c = re.sub(r'\\text\{([^}]+)\}\\\}', r'\\text{\1}}', c)
+    if r'\{' not in c:
+        c = c.replace(r'\}', '}')
+    
+    # 5. Converte moedas dentro do math
     c = re.sub(r'\\text\{R[\\\$]*\}', r'\\text{R\\$}', c)
     c = re.sub(r'\\text\{US[\\\$]*\}', r'\\text{US\\$}', c)
 
-    # 4. Remove cifrões que o modelo possa ter inserido DENTRO de blocos matemáticos
-    c = re.sub(r'(?<!\\)\$', '', c)
-
-    # 5. Escapa porcentagem solta dentro do math
+    # 6. Escapa porcentagem solta dentro do math
     c = re.sub(r'(?<!\\)%', r'\\%', c)
     
-    # 6. Trunca falhas em \right
-    c = re.sub(r'[\s\r\n\t]+ight([\)\}\]|\\])', r' \\right\1', c)
-    c = re.sub(r'[\s\r\n\t]+ight', r' \\right', c)
-    
-    # 7. Se contiver quebra crua '\\' sem nenhum \begin{...} ambiente, encapsula em \begin{aligned}
+    # 7.5 Recupera abertura de ambientes quando o modelo esqueceu o \begin{...} correspondente
+    for env in ['pmatrix', 'bmatrix', 'matrix', 'vmatrix', 'cases', 'aligned']:
+        if f'\\end{{{env}}}' in c and f'\\begin{{{env}}}' not in c:
+            c = f"\\begin{{{env}}}\n" + c
+        if f'\\begin{{{env}}}' in c and f'\\end{{{env}}}' not in c:
+            c = c + f"\n\\end{{{env}}}"
+
+    # 8. Se contiver quebra crua '\\' sem nenhum \begin{...} ambiente, encapsula em \begin{aligned}
     if r'\begin{' not in c and r'\\' in c:
         c = "\\begin{aligned}\n" + c + "\n\\end{aligned}"
     
-    # 8. Se contiver múltiplos axiomas/equações separados por \quad ou \qquad, converte em \begin{aligned} com \\
+    # 9. Se contiver múltiplos axiomas/equações separados por \quad ou \qquad, converte em \begin{aligned} com \\
     if r'\begin{' not in c and (r'\qquad' in c or r'\quad' in c):
         c_lines = [l.strip() for l in re.split(r'\\qquad|\\quad', c) if l.strip()]
         if len(c_lines) > 1:
@@ -46,6 +58,9 @@ def sanitize_display_math(content: str) -> str:
 def sanitize_inline_math(content: str) -> str:
     """Sanitiza o conteúdo interno de um bloco de Inline Math ($...$)."""
     c = content.strip()
+    c = c.replace('$', '')
+    c = re.sub(r'\\hat\{\\Y\}', r'\\hat{Y}', c)
+    c = re.sub(r'\\Y(?=[_^\s\{\}\)])', r'Y', c)
     c = re.sub(r'\\bm\{', r'\\boldsymbol{', c)
     c = re.sub(r'\\bold\{', r'\\mathbf{', c)
     c = re.sub(r'\\+boldsymbol\\+\{([^}]+)\}', r'\\boldsymbol{\1}', c)
@@ -54,7 +69,12 @@ def sanitize_inline_math(content: str) -> str:
     c = re.sub(r'(?<!\\)%', r'\\%', c)
     c = re.sub(r'\\text\{R[\\\$]*\}', r'\\text{R\\$}', c)
     c = re.sub(r'\\text\{US[\\\$]*\}', r'\\text{US\\$}', c)
-    c = re.sub(r'(?<!\\)\$', '', c)
+    c = re.sub(r'([_^])\\\{', r'\1{', c)
+    c = re.sub(r'\\text\{([^}]+)\\\}', r'\\text{\1}', c)
+    c = re.sub(r'\\text\{([^}]+)\}\\\}', r'\\text{\1}}', c)
+    if r'\{' not in c:
+        c = c.replace(r'\}', '}')
+    c = re.sub(r'\\\s*$', '', c)
     return c.strip()
 
 def sanitize_latex_string(text: str) -> str:
@@ -73,12 +93,17 @@ def sanitize_latex_string(text: str) -> str:
     processed = re.sub(r'\\n(?=[\s\n\r\t\d.,;:!?\(\)\[\]\{\}"\'“”«»A-ZÁ-ÿ])', '\n', processed)
     processed = re.sub(r'\\n(?![a-z])', '\n', processed)
 
-    # 1.1 Limpa entidades HTML corrompidas ou grafias quebradas comuns
+    # 1.1 Limpa moedas isoladas para evitar criação de falsos ambientes matemáticos
+    processed = re.sub(r'(?<!\\)R\$\s*(\d)', r'R\\$ \1', processed)
+    processed = re.sub(r'(?<!\\)US\$\s*(\d)', r'US\\$ \1', processed)
+    processed = re.sub(r'R\$\\(?!\$)', r'R\\$', processed)
+
+    # 1.2 Limpa entidades HTML corrompidas ou grafias quebradas comuns
     processed = processed.replace("&bar;", r"\bar ").replace("&sum;", r"\sum ").replace("&Sigma;", r"\Sigma ")
     processed = re.sub(r'\\bar([a-zA-Z])(?![a-zA-Z])', r'\\bar{\1}', processed)
     processed = re.sub(r'\\Sigma(?=\s*\(x_i)', r'\\sum', processed)
 
-    # 1.2 Recupera caracteres de controle gerados por escape indevido em JS (\f -> \frac, \b -> \bar, perda de barras)
+    # 1.3 Recupera caracteres de controle gerados por escape indevido em JS (\f -> \frac, \b -> \bar, perda de barras)
     processed = re.sub(r'[\x0c\u000c]rac', r'\\frac', processed)
     processed = re.sub(r'[\x08\u0008]ar\{', r'\\bar{', processed)
     processed = re.sub(r'[\x08\u0008]eta', r'\\beta', processed)
@@ -88,13 +113,19 @@ def sanitize_latex_string(text: str) -> str:
     processed = re.sub(r'(?<!\\)omega([_\s\^\{])', r'\\omega\1', processed)
     processed = re.sub(r'(?<!\\)quad(?=[\s\$\(\)])', r'\\quad', processed)
 
-    # 2. Normaliza delimitadores clássicos LaTeX sem destruir quebras com espaçamento como \\[8pt]
+    # 1.4 Elimina blocos vazios de $$ repetidos antes de normalizar
+    processed = re.sub(r'\$\$\s*\$\$', '', processed)
+    processed = re.sub(r'(\n?\$\$\s*\n?){2,}', '\n$$\n', processed)
+
+    # 2. Normaliza delimitadores clássicos LaTeX preservando espaçamento vertical como \\[8pt]
     processed = re.sub(r'(?<!\\)\\\[(?![\d\w\s.]*\])', '\n$$\n', processed)
     processed = re.sub(r'(?<!\\)\\\]', '\n$$\n', processed)
     processed = processed.replace(r'\(', '$').replace(r'\)', '$')
 
+    # 2.3 Eleva blocos $...$ com matrizes/ambientes para $$...$$
+    processed = re.sub(r'(?<!\$)\$([^\$\n]*?\\begin\{(?:pmatrix|bmatrix|matrix|cases|aligned|array)\}[\s\S]*?)\$(?!\$)', r'\n$$\n\1\n$$\n', processed)
+
     # 2.5 Desaninha equações onde o modelo abriu $ antes da fórmula e depois colocou $$ para a matriz
-    # Exemplo: 'obtida por $\mathbf{X}^T\mathbf{X} = $$ \begin{pmatrix}... $$ $' -> '$$ \mathbf{X}^T\mathbf{X} = \begin{pmatrix}... $$'
     processed = re.sub(r'(?<!\\)\$\s*([^$\n]*?)\s*\n*\$\$([\s\S]*?)\$\$\s*(?<!\\)\$', r'\n$$\n\1 \2\n$$\n', processed)
     processed = re.sub(r'(?<!\\)\$\s*\$\$', '\n$$\n', processed)
     processed = re.sub(r'\$\$\s*(?<!\\)\$', '\n$$\n', processed)
@@ -114,12 +145,18 @@ def sanitize_latex_string(text: str) -> str:
             
         if part.startswith('$$') and part.endswith('$$') and len(part) >= 4:
             inner = part[2:-2].strip()
+            if not inner:
+                continue
             sanitized_inner = sanitize_display_math(inner)
-            result_parts.append(f"\n$$\n{sanitized_inner}\n$$\n")
+            if sanitized_inner:
+                result_parts.append(f"\n$$\n{sanitized_inner}\n$$\n")
         elif part.startswith('$') and part.endswith('$') and len(part) >= 2 and '\n' not in part:
-            inner = part[1:-1]
+            inner = part[1:-1].strip()
+            if not inner:
+                continue
             sanitized_inner = sanitize_inline_math(inner)
-            result_parts.append(f"${sanitized_inner}$")
+            if sanitized_inner:
+                result_parts.append(f"${sanitized_inner}$")
         else:
             # Prosa comum (fora de cifrões)
             prose = part
@@ -151,28 +188,30 @@ def sanitize_latex_string(text: str) -> str:
     processed_lines = [line.lstrip(' \t') for line in lines]
     processed = '\n'.join(processed_lines)
 
-    # 8. Remove excesso de quebras de linha múltiplas mantendo no máximo parágrafo duplo (\n\n)
+    # 8. Remove excesso de quebras de linha múltiplas e blocos vazios residuais
     processed = re.sub(r'\n{3,}', '\n\n', processed)
+    processed = re.sub(r'\$\$\s*\$\$', '', processed)
 
-    return processed
+    return processed.strip()
 
 def sanitize_json_recursively(obj):
     """
     Percorre recursivamente um dicionário ou lista JSON e aplica sanitize_latex_string em cada campo de texto,
-    preservando intactos códigos brutos como 'codigo_html_gerado' e garantindo delimitadores $$ em 'formalismo_latex'.
+    preservando intactos códigos brutos como 'codigo_html_gerado' e garantindo idempotência e delimitadores limpos.
     """
     if isinstance(obj, str):
         return sanitize_latex_string(obj)
     elif isinstance(obj, dict):
         res = {}
         for k, v in obj.items():
-            if k == "codigo_html_gerado":
+            if k == "codigo_html_gerado" or k == "telemetria_custo":
                 res[k] = v
             elif k == "formalismo_latex" and isinstance(v, str) and v.strip() and v.strip().lower() != "null":
                 f = v.strip()
                 if not f.startswith("$$"):
                     f = re.sub(r'^\$+|\$+$', '', f).strip()
-                    f = f"$$\n{f}\n$$"
+                    if f:
+                        f = f"$$\n{f}\n$$"
                 res[k] = sanitize_latex_string(f)
             else:
                 res[k] = sanitize_json_recursively(v)
