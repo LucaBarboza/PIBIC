@@ -784,24 +784,24 @@ def processar_aula_avulsa_background(req: AulaAvulsaRequest):
                 # Anexa telemetria e custo oficial de tokens
                 conteudo_final["telemetria_custo"] = tracker.obter_resumo()
 
-                db.collection("classrooms").document(req.sala_id).collection("aulas").document(str(req.numero_aula)).set({
+                storage.save_aula(req.sala_id, req.numero_aula, {
                     "numero_aula": req.numero_aula,
                     "titulo": titulo,
                     "conteudo_json": conteudo_final,
                     "publicada": False
                 })
-                db.collection("classrooms").document(req.sala_id).update({
-                    "aulas_geradas": firestore.Increment(1),
-                    "total_aulas": firestore.Increment(1),
-                    "status": "pronto",
-                    "detalhe_progresso": "Aula conclu?da com sucesso!",
-                    "cronograma_oficial": firestore.ArrayUnion([{
-                        "numero_aula": req.numero_aula,
-                        "titulo": titulo,
-                        "objetivo_principal": objetivo,
-                        "topicos_abordados": [topicos]
-                    }])
-                })
+                if db:
+                    db.collection("classrooms").document(req.sala_id).update({
+                        "total_aulas": firestore.Increment(1),
+                        "status": "pronto",
+                        "detalhe_progresso": "Aula concluída com sucesso!",
+                        "cronograma_oficial": firestore.ArrayUnion([{
+                            "numero_aula": req.numero_aula,
+                            "titulo": titulo,
+                            "objetivo_principal": objetivo,
+                            "topicos_abordados": [topicos]
+                        }])
+                    })
     except Exception as e:
         print(f"[ERRO] Erro ao gerar aula avulsa: {e}")
 

@@ -157,19 +157,39 @@ export default function ProfessorDashboard() {
                     <p className="text-sm text-slate-500 flex-1">{sala.nome_disciplina}</p>
                     
                     <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-3">
-                      {(sala.status === "gerando_aulas" || sala.status === "fatiando_ementa" || sala.status.startsWith("erro")) && (
+                      {sala.status !== "pronto" && !sala.status?.startsWith("erro") && (
                         <div className="flex flex-col gap-2">
-                          <div className={`flex justify-between text-xs font-semibold ${sala.status.startsWith("erro") ? 'text-red-600' : 'text-blue-600'}`}>
-                            <span>{sala.status === "fatiando_ementa" ? "Planejando Semestre..." : sala.status.startsWith("erro") ? "Erro na Geração" : "Gerando Aulas..."}</span>
-                            {sala.status === "gerando_aulas" && <span>{sala.aulas_geradas || 0} / {sala.total_aulas || '?'}</span>}
+                          <div className="flex justify-between text-xs font-semibold text-blue-600">
+                            <span className="truncate pr-2">
+                              {sala.detalhe_progresso || (
+                                sala.status === "fatiando_ementa" || sala.status === "fatiando_ementa_pdf"
+                                  ? "Planejando Semestre..." 
+                                  : sala.status === "processando_aulas_manuais"
+                                  ? "Processando Blocos do Professor..."
+                                  : "Gerando Aulas..."
+                              )}
+                            </span>
+                            {sala.status === "gerando_aulas" && (
+                              <span className="shrink-0">{sala.aulas_geradas || 0} / {sala.total_aulas || '?'}</span>
+                            )}
                           </div>
-                          {sala.status === "gerando_aulas" && (
-                            <div className="w-full bg-slate-200 rounded-full h-2">
-                              <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, ((sala.aulas_geradas || 0) / (sala.total_aulas || 1)) * 100)}%` }}></div>
-                            </div>
-                          )}
-                          
+                          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+                              style={{ 
+                                width: sala.total_aulas 
+                                  ? `${Math.max(5, Math.min(100, ((sala.aulas_geradas || 0) / sala.total_aulas) * 100))}%` 
+                                  : "15%" 
+                              }}
+                            ></div>
                           </div>
+                        </div>
+                      )}
+
+                      {sala.status?.startsWith("erro") && (
+                        <div className="p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs font-bold">
+                          ⚠️ Erro na Geração: {sala.status.replace("erro:", "").trim()}
+                        </div>
                       )}
                       
                       {sala.status === "pronto" && (
