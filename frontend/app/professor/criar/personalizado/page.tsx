@@ -21,6 +21,7 @@ export default function CriarSalaPersonalizada() {
   const [disciplinas, setDisciplinas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingText, setSubmittingText] = useState("");
 
   // General Settings
   const [selectedDisciplina, setSelectedDisciplina] = useState("");
@@ -48,32 +49,17 @@ export default function CriarSalaPersonalizada() {
   const [arquivoGlobalNome, setArquivoGlobalNome] = useState("");
   const globalPdfRef = useRef<HTMLInputElement>(null);
 
-  // Uploads state ref para garantir sincronização silenciosa e aguardar caso clique em submeter
-  const uploadsStateRef = useRef<{
-    [key: string]: {
-      arquivo_id?: string;
-      texto_extraido?: string;
-      promise?: Promise<any>;
-    };
-  }>({});
-
-  // Blocos Manuais (Quando for Artesão)
+  // Blocos Manuais (Quando for Artesão) - Anexo 100% local em memória (0ms, zero rede antes do clique em criar)
   const [aulasManuais, setAulasManuais] = useState<any[]>([{
     id: 1,
     titulo: "",
     descricao: "",
-    texto_base_pdf: "",
-    texto_base_notacoes: "",
-    arquivo_base_id: "",
-    arquivo_notacoes_id: "",
+    file_base: null as File | null,
+    file_notacoes: null as File | null,
     nome_arquivo: "",
     nome_arquivo_notacoes: "",
     tamanho_arquivo: "",
     tamanho_arquivo_notacoes: "",
-    syncing: false,
-    syncing_notacoes: false,
-    upload_error: false,
-    upload_notacoes_error: false,
     gerar_exercicios: true,
     sugestoes_exercicios: "",
     gerar_simulador: true,
@@ -98,7 +84,7 @@ export default function CriarSalaPersonalizada() {
     loadDisciplinas();
   }, []);
 
-  const handleGlobalFileUpload = (files: FileList | null) => {
+  const handleGlobalFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     
     const validFiles: File[] = [];
@@ -117,38 +103,29 @@ export default function CriarSalaPersonalizada() {
     const sizeStr = formatFileSize(totalBytes);
     const namesStr = validFiles.length === 1 ? validFiles[0].name : `${validFiles.length} arquivos (${sizeStr})`;
     
-    // Imediato (0ms)
     setArquivoGlobalNome(namesStr);
     setUploadingGlobal(true);
 
     const formData = new FormData();
     validFiles.forEach(f => formData.append("files", f));
 
-    const p = (async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
-        const data = await res.json();
-        if (res.ok) {
-          const arqId = data.arquivo_id || "";
-          const txt = data.texto_extraido || (arqId ? `[PDF_ID:${arqId}]` : "");
-          uploadsStateRef.current["global"] = { arquivo_id: arqId, texto_extraido: txt };
-          setArquivoGlobalPdf(txt);
-        } else {
-          console.error("Erro no upload global:", data.detail);
-        }
-      } catch (e) {
-        console.error("Erro de rede no upload global:", e);
-      } finally {
-        setUploadingGlobal(false);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        setArquivoGlobalPdf(data.texto_extraido || (data.arquivo_id ? `[PDF_ID:${data.arquivo_id}]` : ""));
+      } else {
+        console.error("Erro no upload global:", data.detail);
       }
-    })();
-
-    uploadsStateRef.current["global"] = { promise: p };
+    } catch (e) {
+      console.error("Erro de rede no upload global:", e);
+    } finally {
+      setUploadingGlobal(false);
+    }
   };
 
   const handleRemoveGlobalFile = () => {
-    delete uploadsStateRef.current["global"];
     setArquivoGlobalNome("");
     setArquivoGlobalPdf("");
     setUploadingGlobal(false);
@@ -157,164 +134,48 @@ export default function CriarSalaPersonalizada() {
     }
   };
 
+  // Anexo 100% imediato (0ms, zero rede). O arquivo só é enviado ao backend ao iniciar a aula.
   const handleBlocoFileUpload = (index: number, file: File) => {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".pdf")) return alert("Somente arquivos PDF.");
+    if (!file.name.toLowerCase().endsWith(".pdf")) return alert("Somente arquivos PDF são aceitos.");
     
-    const blocoId = aulasManuais[index]?.id;
-    const key = `base_${blocoId}`;
-
-    // Imediato (0ms)
     const updated = [...aulasManuais];
+    updated[index].file_base = file;
     updated[index].nome_arquivo = file.name;
     updated[index].tamanho_arquivo = formatFileSize(file.size);
-    updated[index].syncing = true;
-    updated[index].upload_error = false;
     setAulasManuais(updated);
-
-    const formData = new FormData();
-    formData.append("files", file);
-
-    const p = (async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
-        const data = await res.json();
-        if (res.ok) {
-          const arqId = data.arquivo_id || "";
-          const txt = data.texto_extraido || (arqId ? `[PDF_ID:${arqId}]` : "");
-          uploadsStateRef.current[key] = { arquivo_id: arqId, texto_extraido: txt };
-          setAulasManuais(prev => {
-            const next = [...prev];
-            const target = next.find(b => b.id === blocoId);
-            if (target && target.nome_arquivo === file.name) {
-              target.arquivo_base_id = arqId;
-              target.texto_base_pdf = txt;
-              target.syncing = false;
-            }
-            return next;
-          });
-        } else {
-          console.error("Erro upload:", data.detail);
-          setAulasManuais(prev => {
-            const next = [...prev];
-            const target = next.find(b => b.id === blocoId);
-            if (target && target.nome_arquivo === file.name) {
-              target.syncing = false;
-              target.upload_error = true;
-            }
-            return next;
-          });
-        }
-      } catch (e) {
-        console.error("Erro de rede:", e);
-        setAulasManuais(prev => {
-          const next = [...prev];
-          const target = next.find(b => b.id === blocoId);
-          if (target && target.nome_arquivo === file.name) {
-            target.syncing = false;
-            target.upload_error = true;
-          }
-          return next;
-        });
-      }
-    })();
-
-    uploadsStateRef.current[key] = { promise: p };
   };
 
   const handleRemoveBlocoFile = (index: number) => {
     const blocoId = aulasManuais[index]?.id;
-    delete uploadsStateRef.current[`base_${blocoId}`];
     const updated = [...aulasManuais];
+    updated[index].file_base = null;
     updated[index].nome_arquivo = "";
     updated[index].tamanho_arquivo = "";
-    updated[index].arquivo_base_id = "";
-    updated[index].texto_base_pdf = "";
-    updated[index].syncing = false;
-    updated[index].upload_error = false;
     setAulasManuais(updated);
     if (fileInputRefs.current[blocoId]) {
       fileInputRefs.current[blocoId].value = "";
     }
   };
 
+  // Notações 100% imediatas (0ms, zero rede).
   const handleNotacoesFileUpload = (index: number, file: File) => {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".pdf")) return alert("Somente arquivos PDF.");
+    if (!file.name.toLowerCase().endsWith(".pdf")) return alert("Somente arquivos PDF são aceitos.");
     
-    const blocoId = aulasManuais[index]?.id;
-    const key = `notacoes_${blocoId}`;
-
-    // Imediato (0ms)
     const updated = [...aulasManuais];
+    updated[index].file_notacoes = file;
     updated[index].nome_arquivo_notacoes = file.name;
     updated[index].tamanho_arquivo_notacoes = formatFileSize(file.size);
-    updated[index].syncing_notacoes = true;
-    updated[index].upload_notacoes_error = false;
     setAulasManuais(updated);
-
-    const formData = new FormData();
-    formData.append("files", file);
-
-    const p = (async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const res = await fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData });
-        const data = await res.json();
-        if (res.ok) {
-          const arqId = data.arquivo_id || "";
-          const txt = data.texto_extraido || (arqId ? `[PDF_ID:${arqId}]` : "");
-          uploadsStateRef.current[key] = { arquivo_id: arqId, texto_extraido: txt };
-          setAulasManuais(prev => {
-            const next = [...prev];
-            const target = next.find(b => b.id === blocoId);
-            if (target && target.nome_arquivo_notacoes === file.name) {
-              target.arquivo_notacoes_id = arqId;
-              target.texto_base_notacoes = txt;
-              target.syncing_notacoes = false;
-            }
-            return next;
-          });
-        } else {
-          console.error("Erro upload:", data.detail);
-          setAulasManuais(prev => {
-            const next = [...prev];
-            const target = next.find(b => b.id === blocoId);
-            if (target && target.nome_arquivo_notacoes === file.name) {
-              target.syncing_notacoes = false;
-              target.upload_notacoes_error = true;
-            }
-            return next;
-          });
-        }
-      } catch (e) {
-        console.error("Erro de rede:", e);
-        setAulasManuais(prev => {
-          const next = [...prev];
-          const target = next.find(b => b.id === blocoId);
-          if (target && target.nome_arquivo_notacoes === file.name) {
-            target.syncing_notacoes = false;
-            target.upload_notacoes_error = true;
-          }
-          return next;
-        });
-      }
-    })();
-
-    uploadsStateRef.current[key] = { promise: p };
   };
 
   const handleRemoveNotacoesFile = (index: number) => {
     const blocoId = aulasManuais[index]?.id;
-    delete uploadsStateRef.current[`notacoes_${blocoId}`];
     const updated = [...aulasManuais];
+    updated[index].file_notacoes = null;
     updated[index].nome_arquivo_notacoes = "";
     updated[index].tamanho_arquivo_notacoes = "";
-    updated[index].arquivo_notacoes_id = "";
-    updated[index].texto_base_notacoes = "";
-    updated[index].syncing_notacoes = false;
-    updated[index].upload_notacoes_error = false;
     setAulasManuais(updated);
     if (fileInputRefsNotacoes.current[blocoId]) {
       fileInputRefsNotacoes.current[blocoId].value = "";
@@ -326,18 +187,12 @@ export default function CriarSalaPersonalizada() {
       id: aulasManuais.length + 1,
       titulo: "",
       descricao: "",
-      texto_base_pdf: "",
-      texto_base_notacoes: "",
-      arquivo_base_id: "",
-      arquivo_notacoes_id: "",
+      file_base: null,
+      file_notacoes: null,
       nome_arquivo: "",
       nome_arquivo_notacoes: "",
       tamanho_arquivo: "",
       tamanho_arquivo_notacoes: "",
-      syncing: false,
-      syncing_notacoes: false,
-      upload_error: false,
-      upload_notacoes_error: false,
       gerar_exercicios: true,
       sugestoes_exercicios: "",
       gerar_simulador: true,
@@ -347,9 +202,6 @@ export default function CriarSalaPersonalizada() {
 
   const removeBloco = (index: number) => {
     if (aulasManuais.length === 1) return;
-    const blocoId = aulasManuais[index]?.id;
-    delete uploadsStateRef.current[`base_${blocoId}`];
-    delete uploadsStateRef.current[`notacoes_${blocoId}`];
     const updated = [...aulasManuais];
     updated.splice(index, 1);
     setAulasManuais(updated);
@@ -365,15 +217,52 @@ export default function CriarSalaPersonalizada() {
     }
     
     setSubmitting(true);
+    setSubmittingText("Enviando materiais anexados... 🚀");
     
     try {
-      // Se houver uploads ainda sincronizando em background, aguarda todos concluírem
-      const pendingPromises = Object.values(uploadsStateRef.current)
-        .map(u => u.promise)
-        .filter(Boolean);
-      if (pendingPromises.length > 0) {
-        await Promise.all(pendingPromises);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const isBlocoABloco = modoCriacao === "artesao";
+
+      // 1. Upload dos arquivos anexados agora (somente ao iniciar a aula)
+      const arquivosBaseIds: Record<number, string> = {};
+      const arquivosNotacoesIds: Record<number, string> = {};
+
+      if (isBlocoABloco) {
+        const uploadPromises: Promise<any>[] = [];
+
+        for (const a of aulasManuais) {
+          if (a.file_base) {
+            const formData = new FormData();
+            formData.append("files", a.file_base);
+            uploadPromises.push(
+              fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData })
+                .then(r => r.json())
+                .then(data => {
+                  if (data.arquivo_id) arquivosBaseIds[a.id] = data.arquivo_id;
+                })
+                .catch(err => console.error("Erro upload PDF base:", err))
+            );
+          }
+          if (a.file_notacoes) {
+            const formData = new FormData();
+            formData.append("files", a.file_notacoes);
+            uploadPromises.push(
+              fetch(`${apiUrl}/api/upload_pdf`, { method: "POST", body: formData })
+                .then(r => r.json())
+                .then(data => {
+                  if (data.arquivo_id) arquivosNotacoesIds[a.id] = data.arquivo_id;
+                })
+                .catch(err => console.error("Erro upload PDF notações:", err))
+            );
+          }
+        }
+
+        if (uploadPromises.length > 0) {
+          await Promise.all(uploadPromises);
+        }
       }
+
+      setSubmittingText("Iniciando esteira de IA... 🚀");
 
       const code = Math.floor(1000 + Math.random() * 9000).toString();
       const disc = disciplinas.find(d => d.id_disciplina === selectedDisciplina);
@@ -391,7 +280,6 @@ export default function CriarSalaPersonalizada() {
       // Mapeamento
       let payloadTipoCarga = "padrao_30";
       let payloadLimite = 30;
-      const isBlocoABloco = modoCriacao === "artesao";
 
       if (isBlocoABloco) {
           payloadTipoCarga = "manual";
@@ -408,20 +296,14 @@ export default function CriarSalaPersonalizada() {
       }
 
       const formattedBlocos = isBlocoABloco ? aulasManuais.map(a => {
-        const baseUpload = uploadsStateRef.current[`base_${a.id}`];
-        const notacoesUpload = uploadsStateRef.current[`notacoes_${a.id}`];
-
-        const arqBaseId = baseUpload?.arquivo_id || a.arquivo_base_id || "";
-        const txtBase = baseUpload?.texto_extraido || a.texto_base_pdf || (arqBaseId ? `[PDF_ID:${arqBaseId}]` : "");
-
-        const arqNotId = notacoesUpload?.arquivo_id || a.arquivo_notacoes_id || "";
-        const txtNot = notacoesUpload?.texto_extraido || a.texto_base_notacoes || (arqNotId ? `[PDF_ID:${arqNotId}]` : "");
+        const arqBaseId = arquivosBaseIds[a.id] || "";
+        const arqNotId = arquivosNotacoesIds[a.id] || "";
 
         return {
           titulo: a.titulo || "Sem título",
           descricao: a.descricao + (a.gerar_exercicios && a.sugestoes_exercicios ? `\n(Dica p/ Exercícios: ${a.sugestoes_exercicios})` : "") + (a.gerar_simulador && a.sugestoes_simulador ? `\n(Dica p/ Simulador: ${a.sugestoes_simulador})` : ""),
-          texto_base_pdf: txtBase,
-          texto_base_notacoes: txtNot,
+          texto_base_pdf: arqBaseId ? `[PDF_ID:${arqBaseId}]` : "",
+          texto_base_notacoes: arqNotId ? `[PDF_ID:${arqNotId}]` : "",
           arquivo_base_id: arqBaseId,
           arquivo_notacoes_id: arqNotId,
           nome_arquivo: a.nome_arquivo || "",
@@ -430,9 +312,6 @@ export default function CriarSalaPersonalizada() {
           gerar_simulador: a.gerar_simulador
         };
       }) : [];
-
-      const globalUpload = uploadsStateRef.current["global"];
-      const globalPdfPayload = globalUpload?.texto_extraido || (globalUpload?.arquivo_id ? `[PDF_ID:${globalUpload.arquivo_id}]` : arquivoGlobalPdf);
 
       const payload = {
         id_sala: docRef.id,
@@ -444,12 +323,10 @@ export default function CriarSalaPersonalizada() {
         tipo_carga_horaria: payloadTipoCarga,
         permitir_aprofundamento: false, // Default desativado
         tipo_crie_seu_jeito: isBlocoABloco ? "bloco_a_bloco" : "automatico",
-        arquivo_global_pdf: isBlocoABloco ? "" : globalPdfPayload,
+        arquivo_global_pdf: isBlocoABloco ? "" : arquivoGlobalPdf,
         aulas_manuais: formattedBlocos,
         modelo_llm: modeloLlm
       };
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       fetch(`${apiUrl}/api/gerar_semestre`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -642,16 +519,7 @@ export default function CriarSalaPersonalizada() {
                                                         <div className="flex items-center gap-1.5 text-[11px] text-blue-600">
                                                             {bloco.tamanho_arquivo && <span>{bloco.tamanho_arquivo}</span>}
                                                             <span>•</span>
-                                                            {bloco.syncing ? (
-                                                                <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
-                                                                    Sincronizando em background...
-                                                                </span>
-                                                            ) : bloco.upload_error ? (
-                                                                <span className="text-red-500 font-semibold">Falha no envio</span>
-                                                            ) : (
-                                                                <span className="text-emerald-700 font-semibold">✓ Anexado (IA analisará em background)</span>
-                                                            )}
+                                                            <span className="text-emerald-700 font-semibold">✓ Anexado</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -717,16 +585,7 @@ export default function CriarSalaPersonalizada() {
                                                                 <div className="flex items-center gap-1.5 text-[11px] text-purple-600">
                                                                     {bloco.tamanho_arquivo_notacoes && <span>{bloco.tamanho_arquivo_notacoes}</span>}
                                                                     <span>•</span>
-                                                                    {bloco.syncing_notacoes ? (
-                                                                        <span className="inline-flex items-center gap-1 text-amber-600 font-medium">
-                                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
-                                                                            Sincronizando em background...
-                                                                        </span>
-                                                                    ) : bloco.upload_notacoes_error ? (
-                                                                        <span className="text-red-500 font-semibold">Falha no envio</span>
-                                                                    ) : (
-                                                                        <span className="text-emerald-700 font-semibold">✓ Anexado (IA analisará em background)</span>
-                                                                    )}
+                                                                    <span className="text-emerald-700 font-semibold">✓ Anexado</span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -844,7 +703,7 @@ export default function CriarSalaPersonalizada() {
                   disabled={submitting}
                   className="flex-1 max-w-sm bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-black text-lg shadow-xl transition-all flex justify-center items-center gap-2"
                 >
-                  {submitting ? "Processando..." : "Construir Semestre 🚀"}
+                  {submitting ? (submittingText || "Processando...") : "Construir Semestre 🚀"}
                 </button>
             </div>
         </div>
