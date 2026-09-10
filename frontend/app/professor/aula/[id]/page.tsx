@@ -13,36 +13,57 @@ import { Menu, X, Play, RefreshCw } from 'lucide-react';
 import AgentDebuggerModal from '@/components/AgentDebuggerModal';
 import { sanitizeLatex } from '@/app/utils/latexSanitizer';
 
-function patchSimuladorHtml(htmlContent: string): string {
-  if (!htmlContent) return htmlContent;
-  const responsiveStyles = `
-    <style>
-      *, *::before, *::after { box-sizing: border-box !important; }
-      html, body { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0.75rem !important; overflow-x: hidden !important; box-sizing: border-box !important; }
-      #simulador-root { width: 100% !important; max-width: 56rem !important; min-width: 0 !important; box-sizing: border-box !important; }
-      #grafico, .js-plotly-plot, .plot-container, .gl-container, .main-svg { width: 100% !important; max-width: 100% !important; }
-      .katex { font-size: 1.02em !important; max-width: 100% !important; }
-      .katex-display { max-width: 100% !important; overflow-x: auto !important; overflow-y: hidden !important; padding-bottom: 4px !important; }
-      #explicacao_dinamica { overflow-wrap: anywhere !important; word-break: break-word !important; white-space: normal !important; max-width: 100% !important; overflow-x: auto !important; }
-      #explicacao_dinamica p, #explicacao_dinamica div, #explicacao_dinamica li { max-width: 100% !important; overflow-wrap: anywhere !important; word-break: break-word !important; }
-      #explicacao_dinamica .katex { display: inline-block !important; max-width: 100% !important; overflow-x: auto !important; overflow-y: hidden !important; vertical-align: middle !important; }
-    </style>
-  `;
-  if (htmlContent.includes('</head>')) {
-    return htmlContent.replace('</head>', `${responsiveStyles}</head>`);
-  }
-  return responsiveStyles + htmlContent;
-}
-
 function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: string, nomeSimulador: string, htmlCode?: string }) {
-  const [html, setHtml] = useState<string | null>(htmlCode || null);
+  const prepararHtmlSimulador = (rawHtml: string) => {
+    if (!rawHtml) return rawHtml;
+    const antiScrollAndResizeScript = `
+      <style>
+        /* Erradica barras de rolagem em KaTeX, Fórmulas e Textos no Simulador */
+        .katex, .katex-display, .katex-html, .katex *, 
+        #explicacao_dinamica, #explicacao_dinamica *,
+        #simulador-root * {
+          overflow-x: visible !important;
+          overflow-y: visible !important;
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        .katex::-webkit-scrollbar, .katex *::-webkit-scrollbar,
+        .katex-display::-webkit-scrollbar, .katex-html::-webkit-scrollbar,
+        #explicacao_dinamica::-webkit-scrollbar, #explicacao_dinamica *::-webkit-scrollbar {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
+        }
+        .katex-display {
+          margin: 0.35em 0 !important;
+          max-width: 100% !important;
+          white-space: normal !important;
+        }
+        .katex-display > .katex {
+          white-space: normal !important;
+          text-align: center;
+        }
+        #explicacao_dinamica {
+          word-break: break-word;
+          overflow: visible !important;
+        }
+      </style>
+    `;
+
+    if (rawHtml.includes('</head>')) {
+      return rawHtml.replace('</head>', `${antiScrollAndResizeScript}</head>`);
+    }
+    return antiScrollAndResizeScript + rawHtml;
+  };
+
+  const [html, setHtml] = useState<string | null>(htmlCode ? prepararHtmlSimulador(htmlCode) : null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [iframeHeight, setIframeHeight] = useState(700);
+  const [iframeHeight, setIframeHeight] = useState(880);
 
   useEffect(() => {
     if (htmlCode) {
-      setHtml(htmlCode);
+      setHtml(prepararHtmlSimulador(htmlCode));
     } else if (!html && !loading && !error) {
       // Dispara automaticamente a geração em tempo real se ainda não foi gerado
       carregarSimulador();
@@ -52,7 +73,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data && (event.data.type === 'simulador_resize' || event.data.type === 'resize') && event.data.height) {
-        const h = Math.min(Math.max(Number(event.data.height), 450), 2400);
+        const h = Math.min(Math.max(Number(event.data.height), 550), 3500);
         setIframeHeight(h);
       }
     };
@@ -72,7 +93,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
       });
       if (!res.ok) throw new Error("Erro na API");
       const data = await res.json();
-      setHtml(data.html_code);
+      setHtml(prepararHtmlSimulador(data.html_code));
     } catch (e) {
       setError(true);
     } finally {
@@ -114,9 +135,9 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
         </div>
       </div>
       <iframe 
-        srcDoc={patchSimuladorHtml(html!)}
-        style={{ height: `${iframeHeight}px`, width: '100%', border: 'none', display: 'block', overflow: 'hidden' }}
-        className="w-full border-none bg-white transition-all duration-150"
+        srcDoc={html!}
+        style={{ height: `${iframeHeight}px`, width: '100%', border: 'none', display: 'block' }}
+        className="w-full border-none bg-white transition-all duration-200"
         sandbox="allow-scripts allow-same-origin"
         scrolling="no"
         title="Simulador Interativo"

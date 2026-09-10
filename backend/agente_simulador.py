@@ -24,96 +24,78 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
   <style>
-    *, *::before, *::after {
-      box-sizing: border-box !important;
-    }
-    html, body {
+    body {
       background-color: #f8fafc;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
       padding: 0;
-      width: 100%;
-      max-width: 100%;
       overflow-x: hidden;
-      box-sizing: border-box;
     }
-    #simulador-root {
-      width: 100%;
-      max-width: 56rem;
-      margin-left: auto;
-      margin-right: auto;
-      min-width: 0;
-      box-sizing: border-box;
+    /* Eliminação absoluta de qualquer barra de rolagem no KaTeX e nas fórmulas */
+    .katex, .katex-display, .katex-html, .katex *, 
+    #explicacao_dinamica, #explicacao_dinamica *,
+    #simulador-root * {
+      overflow-x: visible !important;
+      overflow-y: visible !important;
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
     }
-    /* Gráfico Plotly nunca pode ultrapassar a largura da viewport */
-    #grafico, .js-plotly-plot, .plot-container, .gl-container, .main-svg {
-      width: 100% !important;
-      max-width: 100% !important;
-    }
-    /* KaTeX responsivo: fórmulas em linha e bloco quebram ou rolam suavemente */
-    .katex {
-      font-size: 1.02em;
-      max-width: 100%;
+    .katex::-webkit-scrollbar, .katex *::-webkit-scrollbar,
+    .katex-display::-webkit-scrollbar, .katex-html::-webkit-scrollbar,
+    #explicacao_dinamica::-webkit-scrollbar, #explicacao_dinamica *::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
     }
     .katex-display {
-      max-width: 100%;
-      overflow-x: auto;
-      overflow-y: hidden;
-      padding-bottom: 4px;
+      margin: 0.35em 0 !important;
+      max-width: 100% !important;
+      white-space: normal !important;
     }
-    /* Explicação pedagógica dinâmica com quebra de palavras e contenção garantidas */
+    .katex-display > .katex {
+      white-space: normal !important;
+      text-align: center;
+    }
     #explicacao_dinamica {
-      overflow-wrap: anywhere;
       word-break: break-word;
-      white-space: normal;
-      max-width: 100%;
-      overflow-x: auto;
+      overflow: visible !important;
     }
-    #explicacao_dinamica p, #explicacao_dinamica div, #explicacao_dinamica li {
-      overflow-wrap: anywhere;
-      word-break: break-word;
-      max-width: 100%;
-    }
-    #explicacao_dinamica ul, #explicacao_dinamica ol {
-      padding-left: 1.25rem;
-      margin-top: 0.35rem;
-      margin-bottom: 0.35rem;
-    }
+    .katex { font-size: 1.05em; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased p-3 sm:p-5 pb-8 sm:pb-12 w-full max-w-full overflow-x-hidden box-border">
-  <div id="simulador-root" class="w-full max-w-4xl mx-auto space-y-4 pb-4 min-w-0 box-border">
+<body class="bg-slate-50 text-slate-800 antialiased p-3 sm:p-5 pb-12 sm:pb-16">
+  <div id="simulador-root" class="max-w-4xl mx-auto space-y-4 pb-6">
     <!-- Cabeçalho Acadêmico Pré-Pronto -->
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm w-full max-w-full box-border">
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
       <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">Lab Interativo</span>
-      <h3 class="text-base sm:text-lg font-bold text-slate-800 mt-1 break-words">__TITULO__</h3>
+      <h3 class="text-base sm:text-lg font-bold text-slate-800 mt-1">__TITULO__</h3>
     </div>
 
     <!-- Painel de Parâmetros e Controles Pré-Pronto -->
-    <div class="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm space-y-3 w-full max-w-full box-border">
+    <div class="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
       <div class="flex items-center justify-between border-b border-slate-100 pb-2">
         <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Painel de Parâmetros</h4>
         <span class="text-xs text-slate-400">Ajuste os controles para visualizar a alteração dinâmica</span>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1 w-full max-w-full">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
         __PAINEL_CONTROLES_HTML__
       </div>
     </div>
 
     <!-- Container do Gráfico Plotly -->
-    <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm w-full max-w-full overflow-hidden box-border">
-      <div id="grafico" class="w-full max-w-full overflow-hidden" style="min-height: 400px;"></div>
+    <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div id="grafico" class="w-full" style="min-height: 400px;"></div>
     </div>
 
     <!-- Card de Fórmula / Definição Formal (Embaixo do Gráfico) -->
     __BLOCO_FORMULA_CARD__
 
     <!-- Card de Explicação Pedagógica Dinâmica -->
-    <div class="bg-indigo-50/60 border border-indigo-100 p-3.5 sm:p-5 rounded-xl text-slate-700 shadow-sm w-full max-w-full overflow-hidden box-border">
+    <div class="bg-indigo-50/60 border border-indigo-100 p-4 sm:p-5 rounded-xl text-slate-700 shadow-sm mb-6 pb-3">
       <div class="flex items-center gap-2 mb-2">
         <span class="text-indigo-600 font-bold text-sm">💡 Interpretação Pedagógica:</span>
       </div>
-      <div id="explicacao_dinamica" class="text-xs sm:text-sm leading-relaxed text-slate-700 space-y-2 break-words max-w-full overflow-x-auto">
+      <div id="explicacao_dinamica" class="text-sm leading-relaxed text-slate-700 space-y-1.5">
         __EXPLICACAO_INICIAL__
       </div>
     </div>
@@ -178,11 +160,18 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
     let lastSentHeight = 0;
     function emitirAltura() {
       const root = document.getElementById('simulador-root');
-      if (!root) return;
-      const rect = root.getBoundingClientRect();
-      const h = Math.ceil(Math.max(root.offsetHeight, rect.height, root.scrollHeight));
-      const alturaFinal = Math.min(h + 60, 2400);
-      if (alturaFinal > 80 && Math.abs(alturaFinal - lastSentHeight) >= 4) {
+      const body = document.body;
+      const docEl = document.documentElement;
+
+      const hRoot = root ? Math.max(root.offsetHeight, root.scrollHeight, Math.ceil(root.getBoundingClientRect().height)) : 0;
+      const hBody = body ? Math.max(body.offsetHeight, body.scrollHeight) : 0;
+      const hDoc = docEl ? Math.max(docEl.offsetHeight, docEl.scrollHeight) : 0;
+
+      const hReal = Math.max(hRoot, hBody, hDoc);
+      // Margem de segurança generosa de 80px para evitar cortes no card inferior
+      const alturaFinal = Math.min(Math.max(hReal + 80, 600), 3500);
+
+      if (Math.abs(alturaFinal - lastSentHeight) >= 2) {
         lastSentHeight = alturaFinal;
         window.parent.postMessage({ type: 'simulador_resize', height: alturaFinal }, '*');
       }
@@ -206,47 +195,26 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
             throwOnError: false
           });
         }
-        ajustarFormulasTransbordando();
       } catch (err) {
         console.warn('Erro na renderização KaTeX:', err);
       } finally {
         renderizando = false;
-        setTimeout(emitirAltura, 40);
+        setTimeout(emitirAltura, 50);
+        setTimeout(emitirAltura, 200);
+        setTimeout(emitirAltura, 500);
       }
     }
 
-    function ajustarFormulasTransbordando() {
-      const dinamica = document.getElementById('explicacao_dinamica');
-      if (!dinamica) return;
-      const katexEls = dinamica.querySelectorAll('.katex');
-      katexEls.forEach(el => {
-        if (el.scrollWidth > dinamica.clientWidth + 2 && !el.classList.contains('katex-display')) {
-          el.style.display = 'inline-block';
-          el.style.maxWidth = '100%';
-          el.style.overflowX = 'auto';
-          el.style.overflowY = 'hidden';
-          el.style.verticalAlign = 'middle';
-        }
-      });
-    }
-
-    function redimensionarPlotly() {
-      if (typeof Plotly !== 'undefined' && document.getElementById('grafico')) {
-        try {
-          Plotly.Plots.resize('grafico');
-        } catch (e) {}
-      }
-      emitirAltura();
-    }
-    window.addEventListener('resize', redimensionarPlotly);
-
-    // Observador contínuo de resize no container
+    // Observador contínuo de resize no container e no body
     if (window.ResizeObserver) {
       const ro = new ResizeObserver(() => {
-        redimensionarPlotly();
+        emitirAltura();
       });
       const rootEl = document.getElementById('simulador-root');
       if (rootEl) ro.observe(rootEl);
+      if (document.body) ro.observe(document.body);
+      const expEl = document.getElementById('explicacao_dinamica');
+      if (expEl) ro.observe(expEl);
     }
 
     // Observador de mutações no DOM para detectar updates em explicacao_dinamica e controles
@@ -259,12 +227,15 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
             const t = m.target;
             return t && t.classList && (t.classList.contains('katex') || t.classList.contains('katex-html'));
           });
-          if (apenasKatex) return;
+          if (apenasKatex) {
+            setTimeout(emitirAltura, 50);
+            return;
+          }
 
           if (timerMutacao) clearTimeout(timerMutacao);
           timerMutacao = setTimeout(() => {
             renderizarLatex();
-            redimensionarPlotly();
+            emitirAltura();
           }, 30);
         });
         mo.observe(rootEl, { childList: true, characterData: true, subtree: true });
@@ -275,9 +246,9 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
 
     window.addEventListener('load', () => {
       renderizarLatex();
-      redimensionarPlotly();
       setTimeout(emitirAltura, 100);
       setTimeout(emitirAltura, 400);
+      setTimeout(emitirAltura, 800);
     });
   </script>
 
@@ -290,8 +261,6 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       if (typeof Plotly !== 'undefined' && typeof initSimulation === 'function') {
         initSimulation();
         renderizarLatex();
-        setTimeout(redimensionarPlotly, 50);
-        setTimeout(redimensionarPlotly, 200);
         setTimeout(emitirAltura, 150);
       } else {
         setTimeout(inicializarSimulacaoBlindada, 50);
@@ -329,9 +298,8 @@ Conteúdo Teórico do Subtópico:
      * Para Dispersão e Regressão: 'Inclinação ($\\beta_1$)', 'Intercepto ($\\beta_0$)', 'Dispersão dos Erros ($\\sigma$)', 'Tamanho da Amostra ($n$)'.
      * Para Distribuições de Probabilidade: Parâmetros reais da distribuição (ex: $p$, $n$, $\\mu$, $\\sigma$, $\\lambda$, $gl$).
 
-2. EIXOS FIXOS E ESTÁVEIS NO PLOTLY (RESPONSIVIDADE TOTAL):
-   - No `layout` do Plotly, use SEMPRE `autosize: true`, `autorange: false` e limites `range: [min, max]` fixos bem calibrados nos eixos.
-   - É TERMINANTEMENTE PROIBIDO definir largura fixa em pixels no layout (como `width: 700` ou `width: 800`). O gráfico DEVE ser 100% responsivo para caber em qualquer tela.
+2. EIXOS FIXOS E ESTÁVEIS NO PLOTLY:
+   - No `layout` do Plotly, use SEMPRE `autorange: false` e limites `range: [min, max]` fixos bem calibrados nos eixos.
    - Quando o aluno mover um slider, a curva ou as barras devem mudar contra uma grade fixa e estável.
    - Use o layout claro acadêmico:
      `paper_bgcolor: '#ffffff'`, `plot_bgcolor: '#f8fafc'`, cor de fonte `#334155`, linhas de grade `#e2e8f0`.
@@ -348,9 +316,8 @@ Conteúdo Teórico do Subtópico:
      a) Lê os valores dos inputs.
      b) Atualiza os `<span>` com os valores formatados.
      c) Gera os dados estatísticos e atualiza o gráfico via `Plotly.react('grafico', traces, layout, {{ responsive: true, displayModeBar: false }})`.
-     d) Atualiza o elemento `document.getElementById('explicacao_dinamica').innerHTML` com uma explicação pedagógica dinâmica em português estruturada (usando parágrafos curtos ou listas com `<ul><li class="break-words">...</li></ul>`).
-     e) NUNCA junte fórmulas longas na mesma linha de rótulos de texto. Separe equações longas (como equação do modelo populacional) em bloco próprio com quebra de linha (ex: `<div><strong>Equação do Modelo:</strong></div><div class="my-1 overflow-x-auto">$Y = ...$</div>`).
-     f) Chama `renderizarLatex()` no final para formatar símbolos KaTeX.
+     d) Atualiza o elemento `document.getElementById('explicacao_dinamica').innerHTML` com uma explicação pedagógica dinâmica em português estruturada (usando listas `•` ou parágrafos) que interpreta o resultado atual para o estudante.
+     e) Chama `renderizarLatex()` no final para formatar símbolos KaTeX.
 
 5. FORMATAÇÃO DE SÍMBOLOS MATEMÁTICOS E LATEX:
    - Envolva sempre letras gregas e fórmulas matemáticas entre cifrões `$ ... $` (ex: `($\\mu = 0.0$)`, `($\\sigma = 1.0$)`, `($\\mu \\pm 1\\sigma$)`, `$f(x)$`).
