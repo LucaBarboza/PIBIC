@@ -5,14 +5,18 @@ from typing import List, Dict, Optional, Literal
 # SCHEMA DE OVERRIDE DE DIRETRIZES
 # ==========================================
 
+class ItemNotacaoEspecifica(BaseModel):
+    conceito: str = Field(description="O conceito matemático ou estatístico (ex: média populacional, desvio padrão, independência).")
+    notacao_latex: str = Field(description="A notação exata em formato LaTeX exigida pelo professor (ex: \\mu, \\sigma, \\perp).")
+
 class RegraOverride(BaseModel):
     tom_e_linguagem_professor: Optional[str] = Field(
         default=None,
         description="Perfil pedagógico descritivo e aprofundado (parágrafo rico e detalhado) capturando a voz e identidade do professor: tom didático (ex: instigante, acolhedor, pragmático, formal), nível de diálogo com o aluno, vocabulário e expressões características, tipo de metáforas/analogias preferidas e ritmo de condução das explicações."
     )
-    notacoes_estatisticas_especificas: Optional[Dict[str, str]] = Field(
+    notacoes_estatisticas_especificas: Optional[List[ItemNotacaoEspecifica]] = Field(
         default=None,
-        description="Mapeamento chave-valor de conceitos estatísticos/matemáticos para a notação exata exigida pelo professor. Ex: {'média populacional': '\\\\mu', 'desvio padrão': '\\\\sigma', 'independência': '\\\\perp'}."
+        description="Lista de mapeamentos de conceitos estatísticos/matemáticos para a notação exata em LaTeX exigida pelo professor."
     )
     topicos_obrigatorios: Optional[List[str]] = Field(
         default=None,

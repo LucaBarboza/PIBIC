@@ -243,12 +243,20 @@ def formatar_override_para_prompt(override_dict: dict) -> str:
     if tom and isinstance(tom, str) and tom.strip():
         linhas.append(f"\nESTILO, TOM E LINGUAGEM DO PROFESSOR (ADOTE FIELMENTE NA REDAÇÃO):\n  - {tom.strip()}")
 
-    # 2. Notações específicas (Dicionário de Conceito -> Notação)
+    # 2. Notações específicas (Lista de ItemNotacaoEspecifica ou Dicionário)
     notacoes = override_dict.get("notacoes_estatisticas_especificas")
-    if notacoes and isinstance(notacoes, dict) and len(notacoes) > 0:
+    if notacoes:
         linhas.append("\nREGRAS DE NOTAÇÃO MATEMÁTICA ESTATÍSTICA (SOBRESCREVE O PADRÃO):")
-        for conceito, notacao in notacoes.items():
-            linhas.append(f"  - Conceito: '{conceito}' -> Notação Exata Obrigatória: {notacao}")
+        if isinstance(notacoes, list):
+            for item in notacoes:
+                if isinstance(item, dict):
+                    conceito = item.get("conceito", "")
+                    notacao = item.get("notacao_latex", "")
+                    if conceito and notacao:
+                        linhas.append(f"  - Conceito: '{conceito}' -> Notação Exata Obrigatória: {notacao}")
+        elif isinstance(notacoes, dict):
+            for conceito, notacao in notacoes.items():
+                linhas.append(f"  - Conceito: '{conceito}' -> Notação Exata Obrigatória: {notacao}")
             
     # 3. Tópicos Obrigatórios
     topicos = override_dict.get("topicos_obrigatorios")
