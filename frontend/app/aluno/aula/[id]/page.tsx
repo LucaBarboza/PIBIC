@@ -12,6 +12,27 @@ import 'katex/dist/katex.min.css';
 import { Menu, X, Play, RefreshCw } from 'lucide-react';
 import { sanitizeLatex } from '@/app/utils/latexSanitizer';
 
+function patchSimuladorHtml(htmlContent: string): string {
+  if (!htmlContent) return htmlContent;
+  const responsiveStyles = `
+    <style>
+      *, *::before, *::after { box-sizing: border-box !important; }
+      html, body { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0.75rem !important; overflow-x: hidden !important; box-sizing: border-box !important; }
+      #simulador-root { width: 100% !important; max-width: 56rem !important; min-width: 0 !important; box-sizing: border-box !important; }
+      #grafico, .js-plotly-plot, .plot-container, .gl-container, .main-svg { width: 100% !important; max-width: 100% !important; }
+      .katex { font-size: 1.02em !important; max-width: 100% !important; }
+      .katex-display { max-width: 100% !important; overflow-x: auto !important; overflow-y: hidden !important; padding-bottom: 4px !important; }
+      #explicacao_dinamica { overflow-wrap: anywhere !important; word-break: break-word !important; white-space: normal !important; max-width: 100% !important; overflow-x: auto !important; }
+      #explicacao_dinamica p, #explicacao_dinamica div, #explicacao_dinamica li { max-width: 100% !important; overflow-wrap: anywhere !important; word-break: break-word !important; }
+      #explicacao_dinamica .katex { display: inline-block !important; max-width: 100% !important; overflow-x: auto !important; overflow-y: hidden !important; vertical-align: middle !important; }
+    </style>
+  `;
+  if (htmlContent.includes('</head>')) {
+    return htmlContent.replace('</head>', `${responsiveStyles}</head>`);
+  }
+  return responsiveStyles + htmlContent;
+}
+
 function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: string, nomeSimulador: string, htmlCode?: string }) {
   const [html, setHtml] = useState<string | null>(htmlCode || null);
   const [loading, setLoading] = useState(false);
@@ -92,7 +113,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
         </div>
       </div>
       <iframe 
-        srcDoc={html!}
+        srcDoc={patchSimuladorHtml(html!)}
         style={{ height: `${iframeHeight}px`, width: '100%', border: 'none', display: 'block', overflow: 'hidden' }}
         className="w-full border-none bg-white transition-all duration-150"
         sandbox="allow-scripts allow-same-origin"
