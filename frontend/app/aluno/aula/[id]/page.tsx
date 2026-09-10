@@ -15,8 +15,27 @@ import { sanitizeLatex } from '@/app/utils/latexSanitizer';
 function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: string, nomeSimulador: string, htmlCode?: string }) {
   const prepararHtmlSimulador = (rawHtml: string) => {
     if (!rawHtml) return rawHtml;
+
+    // 1. Cura preventiva de sintaxe LaTeX em simuladores já persistidos (ex: \phi^|h| -> \phi^{|h|})
+    let sanitizado = rawHtml
+      .replace(/\^\|([^|]+)\|/g, '^{|$1|}')
+      .replace(/_\|([^|]+)\|/g, '_{|$1|}');
+
     const antiScrollAndResizeScript = `
       <style>
+        html, body {
+          height: auto !important;
+          min-height: 0 !important;
+          max-height: none !important;
+          overflow-y: hidden !important;
+          overflow-x: hidden !important;
+          margin: 0 !important;
+          padding: 8px 12px 16px 12px !important;
+        }
+        #simulador-root {
+          padding-bottom: 4px !important;
+          margin-bottom: 0 !important;
+        }
         /* Erradica barras de rolagem em KaTeX, Fórmulas e Textos no Simulador */
         .katex, .katex-display, .katex-html, .katex *, 
         #explicacao_dinamica, #explicacao_dinamica *,
@@ -49,16 +68,57 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
       </style>
     `;
 
-    if (rawHtml.includes('</head>')) {
-      return rawHtml.replace('</head>', `${antiScrollAndResizeScript}</head>`);
+    const overrideResizeScript = `
+      <script>
+        (function() {
+          function recalcularAlturaSegura() {
+            var root = document.getElementById('simulador-root');
+            if (!root) return;
+            var rect = root.getBoundingClientRect();
+            var h = Math.ceil(rect.height || root.offsetHeight || 600);
+            var finalH = Math.min(Math.max(h + 30, 500), 1600);
+            if (Math.abs(finalH - (window.__lastSentSafeH || 0)) >= 3) {
+              window.__lastSentSafeH = finalH;
+              window.parent.postMessage({ type: 'simulador_resize', height: finalH }, '*');
+            }
+          }
+          window.emitirAltura = recalcularAlturaSegura;
+          window.addEventListener('load', function() {
+            recalcularAlturaSegura();
+            setTimeout(recalcularAlturaSegura, 150);
+            setTimeout(recalcularAlturaSegura, 500);
+            setTimeout(recalcularAlturaSegura, 1000);
+          });
+          if (window.ResizeObserver) {
+            var roSafe = new ResizeObserver(function() { recalcularAlturaSegura(); });
+            var r = document.getElementById('simulador-root');
+            if (r) roSafe.observe(r);
+            var exp = document.getElementById('explicacao_dinamica');
+            if (exp) roSafe.observe(exp);
+          }
+        })();
+      </script>
+    `;
+
+    if (sanitizado.includes('</head>')) {
+      sanitizado = sanitizado.replace('</head>', `${antiScrollAndResizeScript}</head>`);
+    } else {
+      sanitizado = antiScrollAndResizeScript + sanitizado;
     }
-    return antiScrollAndResizeScript + rawHtml;
+
+    if (sanitizado.includes('</body>')) {
+      sanitizado = sanitizado.replace('</body>', `${overrideResizeScript}</body>`);
+    } else {
+      sanitizado = sanitizado + overrideResizeScript;
+    }
+
+    return sanitizado;
   };
 
   const [html, setHtml] = useState<string | null>(htmlCode ? prepararHtmlSimulador(htmlCode) : null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [iframeHeight, setIframeHeight] = useState(880);
+  const [iframeHeight, setIframeHeight] = useState(720);
 
   useEffect(() => {
     if (htmlCode) {
@@ -72,7 +132,8 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data && (event.data.type === 'simulador_resize' || event.data.type === 'resize') && event.data.height) {
-        const h = Math.min(Math.max(Number(event.data.height), 550), 3500);
+        // Trava estrita de altura baseada apenas no conteúdo de simulador-root (evita ratchet infinito até 3500px)
+        const h = Math.min(Math.max(Number(event.data.height), 500), 1600);
         setIframeHeight(h);
       }
     };

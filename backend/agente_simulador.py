@@ -24,12 +24,15 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
   <style>
-    body {
+    html, body {
       background-color: #f8fafc;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
       padding: 0;
       overflow-x: hidden;
+      overflow-y: hidden;
+      height: auto !important;
+      min-height: 0 !important;
     }
     /* Eliminação absoluta de qualquer barra de rolagem no KaTeX e nas fórmulas */
     .katex, .katex-display, .katex-html, .katex *, 
@@ -63,8 +66,8 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
     .katex { font-size: 1.05em; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased p-3 sm:p-5 pb-12 sm:pb-16">
-  <div id="simulador-root" class="max-w-4xl mx-auto space-y-4 pb-6">
+<body class="bg-slate-50 text-slate-800 antialiased p-3 sm:p-5 pb-6">
+  <div id="simulador-root" class="max-w-4xl mx-auto space-y-4 pb-2">
     <!-- Cabeçalho Acadêmico Pré-Pronto -->
     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
       <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">Lab Interativo</span>
@@ -91,7 +94,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
     __BLOCO_FORMULA_CARD__
 
     <!-- Card de Explicação Pedagógica Dinâmica -->
-    <div class="bg-indigo-50/60 border border-indigo-100 p-4 sm:p-5 rounded-xl text-slate-700 shadow-sm mb-6 pb-3">
+    <div class="bg-indigo-50/60 border border-indigo-100 p-4 sm:p-5 rounded-xl text-slate-700 shadow-sm mb-4 pb-3">
       <div class="flex items-center gap-2 mb-2">
         <span class="text-indigo-600 font-bold text-sm">💡 Interpretação Pedagógica:</span>
       </div>
@@ -111,23 +114,28 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       
       // 1. Recupera escapes de caracteres de controle e tabs corrompidos
       res = res
-        .replace(/[\\x0c\\u000c]rac/g, '\\\\frac')
-        .replace(/[\\x08\\u0008]ar\\{/g, '\\\\bar{')
-        .replace(/[\\x08\\u0008]eta/g, '\\\\beta')
-        .replace(/[\\x08\\u0008]inom/g, '\\\\binom')
-        .replace(/[\\x08\\u0008]mathbf/g, '\\\\mathbf')
-        .replace(/\\t(ext|au|heta|imes)/g, '\\\\$1')
-        .replace(/(?<![\\\\f\\x0c\\u000c])rac\\{/g, '\\\\frac{');
+        .replace(/[\x0c\u000c]rac/g, '\\frac')
+        .replace(/[\x08\u0008]ar\\{/g, '\\bar{')
+        .replace(/[\x08\u0008]eta/g, '\\beta')
+        .replace(/[\x08\u0008]inom/g, '\\binom')
+        .replace(/[\x08\u0008]mathbf/g, '\\mathbf')
+        .replace(/\t(ext|au|heta|imes)/g, '\\$1')
+        .replace(/(?<![\\f\x0c\u000c])rac\\{/g, '\\frac{');
 
-      // 2. Parênteses contendo expressões matemáticas como (\\mu), (\\sigma = 1.0), (\\mu \\pm 1\\sigma), (k \\cdot \\sigma)
+      // 2. Corrige potências e subscritos compostos sem chaves (ex: phi^|h| -> phi^{|h|}, e^-x -> e^{-x})
+      res = res
+        .replace(/\\^\\|([^|]+)\\|/g, '^{|$1|}')
+        .replace(/_\\|([^|]+)\\|/g, '_{|$1|}');
+
+      // 3. Parênteses contendo expressões matemáticas como (mu), (sigma = 1.0)
       res = res.replace(/\\(([^)]*\\\\(?:mu|sigma|alpha|beta|theta|lambda|pi|gamma|delta|phi|omega|tau|rho|hat|bar|pm|approx|leq|geq|cdot)[^)]*)\\)/g, function(match, interior) {
         var limpo = interior.trim();
         if (limpo.startsWith('$') && limpo.endsWith('$')) return match;
         return '($' + limpo + '$)';
       });
 
-      // 3. Comandos LaTeX soltos restantes (que não estão em $...$)
-      var cmdRegex = /(?<![\\$\\a-zA-Z0-9])\\\\(mu|sigma|alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|iota|kappa|lambda|nu|xi|pi|varpi|rho|varrho|varsigma|tau|upsilon|phi|varphi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega|pm|mp|cdot|times|approx|neq|ne|leq|geq|le|ge|infty|forall|exists|partial|nabla)(?![a-zA-Z0-9])/g;
+      // 4. Comandos LaTeX soltos restantes (que não estão em $...$)
+      var cmdRegex = /(?<![\\$a-zA-Z0-9])\\\\(mu|sigma|alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|iota|kappa|lambda|nu|xi|pi|varpi|rho|varrho|varsigma|tau|upsilon|phi|varphi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega|pm|mp|cdot|times|approx|neq|ne|leq|geq|le|ge|infty|forall|exists|partial|nabla)(?![a-zA-Z0-9])/g;
 
       var partes = res.split(/(\\$\\$[\\s\\S]*?\\$\\$|\\$[^\\$\\n]+?\\$)/);
       for (var i = 0; i < partes.length; i += 2) {
@@ -142,7 +150,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       if (!node) return;
       if (node.nodeType === Node.TEXT_NODE) {
         const val = node.nodeValue;
-        if (val && (val.includes('\\\\') || val.includes('\\t') || val.includes('\\x0c') || val.includes('\\x08'))) {
+        if (val && (val.includes('\\') || val.includes('\t') || val.includes('\x0c') || val.includes('\x08') || val.includes('^|') || val.includes('_|'))) {
           const modificado = prepararLatexSolto(val);
           if (modificado !== val) {
             node.nodeValue = modificado;
@@ -160,18 +168,14 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
     let lastSentHeight = 0;
     function emitirAltura() {
       const root = document.getElementById('simulador-root');
-      const body = document.body;
-      const docEl = document.documentElement;
+      if (!root) return;
 
-      const hRoot = root ? Math.max(root.offsetHeight, root.scrollHeight, Math.ceil(root.getBoundingClientRect().height)) : 0;
-      const hBody = body ? Math.max(body.offsetHeight, body.scrollHeight) : 0;
-      const hDoc = docEl ? Math.max(docEl.offsetHeight, docEl.scrollHeight) : 0;
+      // Medição estrita do container de conteúdo (NUNCA do document.body ou documentElement para impedir loop ratchet de expansão)
+      const rect = root.getBoundingClientRect();
+      const hContent = Math.ceil(rect.height || root.offsetHeight || 600);
+      const alturaFinal = Math.min(Math.max(hContent + 30, 520), 1600);
 
-      const hReal = Math.max(hRoot, hBody, hDoc);
-      // Margem de segurança generosa de 80px para evitar cortes no card inferior
-      const alturaFinal = Math.min(Math.max(hReal + 80, 600), 3500);
-
-      if (Math.abs(alturaFinal - lastSentHeight) >= 2) {
+      if (Math.abs(alturaFinal - lastSentHeight) >= 3) {
         lastSentHeight = alturaFinal;
         window.parent.postMessage({ type: 'simulador_resize', height: alturaFinal }, '*');
       }
@@ -205,14 +209,13 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       }
     }
 
-    // Observador contínuo de resize no container e no body
+    // Observador contínuo de resize estritamente no container de conteúdo (NUNCA no document.body)
     if (window.ResizeObserver) {
       const ro = new ResizeObserver(() => {
         emitirAltura();
       });
       const rootEl = document.getElementById('simulador-root');
       if (rootEl) ro.observe(rootEl);
-      if (document.body) ro.observe(document.body);
       const expEl = document.getElementById('explicacao_dinamica');
       if (expEl) ro.observe(expEl);
     }
@@ -321,6 +324,7 @@ Conteúdo Teórico do Subtópico:
 
 5. FORMATAÇÃO DE SÍMBOLOS MATEMÁTICOS E LATEX:
    - Envolva sempre letras gregas e fórmulas matemáticas entre cifrões `$ ... $` (ex: `($\\mu = 0.0$)`, `($\\sigma = 1.0$)`, `($\\mu \\pm 1\\sigma$)`, `$f(x)$`).
+   - Use SEMPRE chaves completas `{}` em expoentes e subscritos compostos (ex: `\\phi^{{|h|}}` e JAMAIS `\\phi^|h|`; `e^{{-x}}` e JAMAIS `e^-x`; `X_{{t+1}}`).
    - Não use quebras literais de texto sem tags HTML (`<br>` ou `<p>`).
 
 Retorne estritamente o JSON estruturado conforme o schema.
@@ -360,7 +364,7 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, contexto_subtopico
         contexto_subtopico=contexto_subtopico or "Conceitos teóricos e visuais da aula."
     )
     
-    print(f"\\n[Agente Simulador ({modelo_alvo})] Projetando componentes estruturados para '{nome_simulador}'...")
+    print(f"\n[Agente Simulador ({modelo_alvo})] Projetando componentes estruturados para '{nome_simulador}'...")
     
     try:
         if logger:
@@ -426,7 +430,10 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, contexto_subtopico
             # 1. Recupera caracteres de controle gerados por escape no JSON
             codigo_js = codigo_js.replace('\x0c', r'\f').replace('\x08', r'\b')
             codigo_js = re.sub(r'\t(ext|au|heta|imes)', r'\\t\1', codigo_js)
-            # 2. Garante que qualquer comando LaTeX em strings JS tenha barras duplas '\\'
+            # 2. Corrige potências e subscritos sem chaves (ex: \phi^|h| -> \phi^{|h|}, _|h| -> _{|h|})
+            codigo_js = re.sub(r'\^\|([^|]+)\|', r'^{|\1|}', codigo_js)
+            codigo_js = re.sub(r'_\|([^|]+)\|', r'_{|\1|}', codigo_js)
+            # 3. Garante que qualquer comando LaTeX em strings JS tenha barras duplas '\\'
             return re.sub(rf'(?<!\\)\\({comandos})(?![a-zA-Z])', r'\\\\\1', codigo_js)
 
         codigo_js_sanitizado = sanitizar_js_latex(comp.codigo_javascript_logica.strip())
