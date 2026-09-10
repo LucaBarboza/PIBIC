@@ -157,8 +157,8 @@ Produza um texto denso, rico, completo e detalhado em português que servirá de
         
         if resposta and resposta.text:
             try:
-                dados_dict = json.loads(resposta.text)
-                texto_formatado = formatar_material_base_para_prompt(dados_dict)
+                material_dict = json.loads(resposta.text)
+                texto_formatado = formatar_material_base_para_prompt(material_dict)
             except Exception:
                 texto_formatado = resposta.text.strip()
                 

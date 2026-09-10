@@ -32,13 +32,13 @@ class RegraOverride(BaseModel):
     )
 
 class MaterialBaseExtraido(BaseModel):
-    titulo_ou_tema: str = Field(description="Título ou tema central identificado no documento.")
-    visao_geral_pedagogica: str = Field(description="Resumo pedagógico e didático da abordagem do professor para esta aula.")
-    sequencia_topicos: List[str] = Field(description="Sequência de assuntos e tópicos na ordem exata apresentada pelo professor.")
-    formulas_e_definicoes_latex: List[str] = Field(description="Todas as fórmulas, teoremas e definições matemáticas rigorosamente em LaTeX ($ ou $$).")
-    exemplos_e_exercicios: List[str] = Field(description="Exemplos numéricos, problemas e passos aritméticos presentes nas notas.")
-    convencoes_e_notacoes: List[str] = Field(description="Convenções de notação e termos técnicos utilizados pelo professor.")
-    conteudo_didatico_completo: str = Field(description="Texto denso e completo articulando todo o conteúdo conceitual e didático para orientar a redação da aula.")
+    titulo_ou_tema: str = Field(description="Título ou tema central do documento PDF fornecido pelo professor.")
+    visao_geral_pedagogica: str = Field(description="Resumo pedagógico e didático da abordagem e objetivos da aula contidos nas notas.")
+    sequencia_topicos: List[str] = Field(description="Lista sequencial dos tópicos e subtópicos na ordem exata apresentada pelo professor.")
+    formulas_e_definicoes_latex: List[str] = Field(description="Todas as fórmulas matemáticas, teoremas e definições transcritos rigorosamente em formato LaTeX ($ ou $$).")
+    exemplos_e_exercicios: List[str] = Field(description="Exemplos numéricos, problemas propostos ou enunciados presentes nas notas.")
+    convencoes_e_notacoes: List[str] = Field(description="Convenções de notação matemática e termos técnicos específicos empregados pelo professor.")
+    conteudo_didatico_completo: str = Field(description="Texto aprofundado e completo articulando todo o conteúdo conceitual e didático das notas do professor.")
 
 # ==========================================
 # SCHEMAS DO AGENTE 1 (ROTEIRISTA PEDAGÓGICO)
