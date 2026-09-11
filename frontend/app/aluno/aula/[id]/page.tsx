@@ -353,6 +353,24 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
           throwOnError: false
         });
       }
+      // Oculta os blocos de modelo matemático e interpretação pedagógica do DOM do iframe
+      const allDivs = doc.querySelectorAll('div, span');
+      allDivs.forEach((el) => {
+        const txt = el.textContent || '';
+        if (txt.includes('Modelo Matemático do Laboratório')) {
+          const card = el.closest('.rounded-xl') || el.parentElement;
+          if (card && card.id !== 'simulador-root') {
+            (card as HTMLElement).style.setProperty('display', 'none', 'important');
+          }
+        }
+        if (txt.includes('💡 Interpretação Pedagógica:') || txt.includes('Interpretação Pedagógica:')) {
+          const card = el.closest('.rounded-xl') || el.parentElement;
+          if (card && card.id !== 'simulador-root') {
+            (card as HTMLElement).style.setProperty('display', 'none', 'important');
+          }
+        }
+      });
+
       if (typeof (win as any).renderizarLatex === 'function') {
         (win as any).renderizarLatex();
       }
