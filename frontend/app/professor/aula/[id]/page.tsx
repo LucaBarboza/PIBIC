@@ -908,6 +908,7 @@ export default function ProfessorSemesterViewer() {
                       <span className={`font-bold ${aulaCompleta ? 'text-blue-700' : 'text-slate-500'}`}>Aula {numero}</span>
                       {aulaCompleta && (
                         <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          {/* [MODO APRESENTAÇÃO - OCULTO TEMPORARIAMENTE] Preço da Aula
                           {aulaCompleta.conteudo_json?.telemetria_custo && (
                             <span 
                               className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-bold"
@@ -916,8 +917,11 @@ export default function ProfessorSemesterViewer() {
                               💰 {aulaCompleta.conteudo_json.telemetria_custo.custo_formatado_brl || `R$ ${aulaCompleta.conteudo_json.telemetria_custo.custo_total_brl?.toFixed(2)}`}
                             </span>
                           )}
+                          */}
                           <span className="text-[10px] bg-green-100 text-green-700 px-1 rounded uppercase font-bold">Pronta</span>
+                          {/* [MODO APRESENTAÇÃO - OCULTO TEMPORARIAMENTE] Badge Oculta
                           {!aulaCompleta.publicada && <span className="text-[10px] bg-slate-200 text-slate-600 px-1 rounded uppercase font-bold" title="Oculta para alunos">🙈 Oculta</span>}
+                          */}
                         </div>
                       )}
                     </div>
@@ -1097,16 +1101,18 @@ export default function ProfessorSemesterViewer() {
                   >
                     🗑️ Excluir
                   </button>
+                  {/* [MODO APRESENTAÇÃO - OCULTO TEMPORARIAMENTE] Botão Visível/Oculta
                   <button
                     onClick={() => togglePublish(selectedAula)}
-                  className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-full font-bold shadow-sm transition-colors flex items-center gap-1.5 ${
-                    selectedAula.publicada 
-                      ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300' 
-                      : 'bg-slate-200 text-slate-600 hover:bg-slate-300 border border-slate-300'
-                  }`}
-                >
-                  {selectedAula.publicada ? "👁️ Visível" : "🙈 Oculta"}
-                </button>
+                    className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm rounded-full font-bold shadow-sm transition-colors flex items-center gap-1.5 ${
+                      selectedAula.publicada 
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300' 
+                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300 border border-slate-300'
+                    }`}
+                  >
+                    {selectedAula.publicada ? "👁️ Visível" : "🙈 Oculta"}
+                  </button>
+                  */}
                 </div>
               </div>
 
