@@ -658,9 +658,21 @@ class SimuladorRequest(BaseModel):
 @app.post("/api/gerar_simulador")
 def api_gerar_simulador(req: SimuladorRequest):
     import agente_simulador
+    import agente_validador_latex
     html = agente_simulador.gerar_simulador_html(req.tema_aula, req.nome_simulador)
     if not html:
         raise HTTPException(status_code=500, detail="Erro ao gerar simulador")
+    
+    # Auditoria e auto-cura KaTeX / JavaScript no simulador gerado
+    try:
+        sim_obj = {"nome_simulador": req.nome_simulador, "codigo_html_gerado": html}
+        check = agente_validador_latex.compilar_katex_real({"simuladores_da_aula": [sim_obj]})
+        if not check.get("aprovado") or check.get("total_erros", 0) > 0:
+            sim_curado = agente_validador_latex.reparar_simulador_com_agente(sim_obj, check.get("erros", []))
+            html = sim_curado.get("codigo_html_gerado", html)
+    except Exception as err:
+        print(f"[AVISO] Falha na auto-cura do simulador avulso: {err}")
+
     return {"html_code": html}
 
 class VisibilidadeRequest(BaseModel):
