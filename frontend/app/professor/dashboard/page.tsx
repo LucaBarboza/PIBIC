@@ -122,22 +122,22 @@ export default function ProfessorDashboard() {
             📚 Minhas Turmas Ativas
           </button>
           <button 
-            onClick={() => setView("create")}
-            className={`px-4 sm:px-6 py-2 rounded-full text-xs sm:text-sm whitespace-nowrap font-medium transition ${view === "create" ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-slate-300"}`}
+            onClick={() => router.push("/professor/criar/personalizado")}
+            className="px-4 sm:px-6 py-2 rounded-full text-xs sm:text-sm whitespace-nowrap font-medium transition bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
           >
-            ✨ Gerar Novo Semestre
+            ✨ Gerar Aulas
           </button>
         </div>
 
         {/* View: Lista de Turmas */}
         {view === "list" && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 md:p-8">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-6">Salas e Semestres Gerenciados</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-6">Aulas Geradas</h2>
             
             {minhasSalas.length === 0 ? (
               <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-300">
                 <p className="text-slate-500 mb-4">Você ainda não gerou nenhuma turma para este semestre.</p>
-                <button onClick={() => setView("create")} className="text-blue-600 font-medium hover:underline">
+                <button onClick={() => router.push("/professor/criar/personalizado")} className="text-blue-600 font-medium hover:underline">
                   Gerar sua primeira turma agora
                 </button>
               </div>
@@ -217,14 +217,13 @@ export default function ProfessorDashboard() {
           </div>
         )}
 
-        {/* View: Hub de Criação (Navega para Páginas Dedicadas) */}
+        {/* [MODO APRESENTAÇÃO - OCULTO TEMPORARIAMENTE] Hub de Criação
         {view === "create" && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
             <h2 className="text-2xl font-bold text-slate-800 mb-2">Qual tipo de semestre deseja criar?</h2>
             <p className="text-slate-500 mb-8">Nossa plataforma oferece duas experiências diferentes de acordo com a sua necessidade.</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Botão A: Inteligente */}
               <div 
                 className="border border-slate-200 rounded-xl p-6 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group bg-slate-50 hover:bg-blue-50/30" 
                 onClick={() => router.push("/professor/criar/inteligente")}
@@ -235,7 +234,6 @@ export default function ProfessorDashboard() {
                 <span className="text-blue-600 font-bold text-sm">Criar Sala Inteligente →</span>
               </div>
 
-              {/* Botão B: Personalizado */}
               <div 
                 className="border border-slate-200 rounded-xl p-6 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group bg-slate-50 hover:bg-blue-50/30" 
                 onClick={() => router.push("/professor/criar/personalizado")}
@@ -248,6 +246,7 @@ export default function ProfessorDashboard() {
             </div>
           </div>
         )}
+        */}
       
       
 </main>

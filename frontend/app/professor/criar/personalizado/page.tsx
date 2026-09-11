@@ -28,7 +28,7 @@ export default function CriarSalaPersonalizada() {
   const [diretrizesGerais, setDiretrizesGerais] = useState("");
   
   // Logic Tree State
-  const [modoCriacao, setModoCriacao] = useState<"magico" | "artesao">("magico");
+  const [modoCriacao, setModoCriacao] = useState<"magico" | "artesao">("artesao");
   const [modeloLlm, setModeloLlm] = useState<"2.5" | "3.5">("3.5");
 
   // Expander States
@@ -383,6 +383,7 @@ export default function CriarSalaPersonalizada() {
                 />
             </div>
 
+            {/* [MODO APRESENTAÇÃO - OCULTO TEMPORARIAMENTE] Seleção Mágico vs Artesão
             <div className="mb-8 p-6 bg-indigo-50 rounded-xl border border-indigo-100">
                 <h4 className="text-lg font-bold text-indigo-900 mb-4">Como você deseja criar o semestre?</h4>
                 <div className="flex flex-col md:flex-row gap-4">
@@ -404,6 +405,7 @@ export default function CriarSalaPersonalizada() {
                     </button>
                 </div>
             </div>
+            */}
 
             {/* ZONA CONDICIONAL: MODO MÁGICO VS MODO ARTESÃO */}
             {modoCriacao === "magico" ? (
@@ -661,7 +663,7 @@ export default function CriarSalaPersonalizada() {
                 </div>
             )}
 
-            {/* Expander de Configurações Avançadas do Semestre */}
+            {/* [MODO APRESENTAÇÃO - OCULTO TEMPORARIAMENTE] Expander de Configurações Avançadas do Semestre
             <div className="mt-8 border border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden">
                 <button
                     type="button"
@@ -690,6 +692,7 @@ export default function CriarSalaPersonalizada() {
                     </div>
                 )}
             </div>
+            */}
 
             <div className="pt-8 mt-6 border-t border-slate-200 flex justify-end gap-4">
                 <button 
@@ -703,7 +706,7 @@ export default function CriarSalaPersonalizada() {
                   disabled={submitting}
                   className="flex-1 max-w-sm bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-black text-lg shadow-xl transition-all flex justify-center items-center gap-2"
                 >
-                  {submitting ? (submittingText || "Processando...") : "Construir Semestre 🚀"}
+                  {submitting ? (submittingText || "Processando...") : "Gerar Aulas 🚀"}
                 </button>
             </div>
         </div>
