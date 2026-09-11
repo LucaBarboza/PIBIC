@@ -205,7 +205,18 @@ def sanitize_json_recursively(obj):
     elif isinstance(obj, dict):
         res = {}
         for k, v in obj.items():
-            if k == "codigo_html_gerado" or k == "telemetria_custo":
+            if k == "codigo_html_gerado":
+                if isinstance(v, str):
+                    res[k] = (v
+                        .replace("val.includes('\\')", "val.indexOf(String.fromCharCode(92)) !== -1")
+                        .replace("val.includes('\\\\')", "val.indexOf(String.fromCharCode(92)) !== -1")
+                        .replace("val.includes('\t')", "val.indexOf('\\t') !== -1")
+                        .replace("val.includes('\x0c')", "val.indexOf('\\x0c') !== -1")
+                        .replace("val.includes('\x08')", "val.indexOf('\\x08') !== -1")
+                    )
+                else:
+                    res[k] = v
+            elif k == "telemetria_custo":
                 res[k] = v
             elif k == "formalismo_latex" and isinstance(v, str) and v.strip() and v.strip().lower() != "null":
                 f = v.strip()

@@ -22,6 +22,14 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
       .replace(/\^\|([^|]+)\|/g, '^{|$1|}')
       .replace(/_\|([^|]+)\|/g, '_{|$1|}');
 
+    // 2. Cura preventiva contra erros de escape de backslash em simuladores legados no Firestore
+    sanitizado = sanitizado
+      .replace(/val\.includes\('\\'\)/g, "val.indexOf(String.fromCharCode(92)) !== -1")
+      .replace(/val\.includes\('\\\\'\)/g, "val.indexOf(String.fromCharCode(92)) !== -1")
+      .replace(/val\.includes\('\t'\)/g, "val.indexOf('\\t') !== -1")
+      .replace(/val\.includes\('\x0c'\)/g, "val.indexOf('\\x0c') !== -1")
+      .replace(/val\.includes\('\x08'\)/g, "val.indexOf('\\x08') !== -1");
+
     const antiScrollAndResizeScript = `
       <style>
         html, body {
@@ -83,12 +91,31 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
               window.parent.postMessage({ type: 'simulador_resize', height: finalH }, '*');
             }
           }
+          function reforcarRenderLatex() {
+            try {
+              if (typeof window.renderizarLatex === 'function') {
+                window.renderizarLatex();
+              } else if (window.renderMathInElement && document.getElementById('simulador-root')) {
+                var bslash = String.fromCharCode(92);
+                window.renderMathInElement(document.getElementById('simulador-root'), {
+                  delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: bslash + '(', right: bslash + ')', display: false},
+                    {left: bslash + '[', right: bslash + ']', display: true}
+                  ],
+                  throwOnError: false
+                });
+              }
+            } catch (e) {}
+          }
           window.emitirAltura = recalcularAlturaSegura;
           window.addEventListener('load', function() {
+            reforcarRenderLatex();
             recalcularAlturaSegura();
-            setTimeout(recalcularAlturaSegura, 150);
-            setTimeout(recalcularAlturaSegura, 500);
-            setTimeout(recalcularAlturaSegura, 1000);
+            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 150);
+            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 500);
+            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 1000);
           });
           if (window.ResizeObserver) {
             var roSafe = new ResizeObserver(function() { recalcularAlturaSegura(); });

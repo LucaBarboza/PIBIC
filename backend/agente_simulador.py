@@ -112,15 +112,17 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
 
       let res = texto;
       
+      const bslash = String.fromCharCode(92);
+      
       // 1. Recupera escapes de caracteres de controle e tabs corrompidos
       res = res
-        .replace(/[\x0c\u000c]rac/g, '\\frac')
-        .replace(/[\x08\u0008]ar\\{/g, '\\bar{')
-        .replace(/[\x08\u0008]eta/g, '\\beta')
-        .replace(/[\x08\u0008]inom/g, '\\binom')
-        .replace(/[\x08\u0008]mathbf/g, '\\mathbf')
-        .replace(/\t(ext|au|heta|imes)/g, '\\$1')
-        .replace(/(?<![\\f\x0c\u000c])rac\\{/g, '\\frac{');
+        .replace(/[\x0c\u000c]rac/g, bslash + 'frac')
+        .replace(/[\x08\u0008]ar\\{/g, bslash + 'bar{')
+        .replace(/[\x08\u0008]eta/g, bslash + 'beta')
+        .replace(/[\x08\u0008]inom/g, bslash + 'binom')
+        .replace(/[\x08\u0008]mathbf/g, bslash + 'mathbf')
+        .replace(/\t(ext|au|heta|imes)/g, bslash + '$1')
+        .replace(/(?<![\\f\x0c\u000c])rac\\{/g, bslash + 'frac{');
 
       // 2. Corrige potências e subscritos compostos sem chaves (ex: phi^|h| -> phi^{|h|}, e^-x -> e^{-x})
       res = res
@@ -140,7 +142,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       var partes = res.split(/(\\$\\$[\\s\\S]*?\\$\\$|\\$[^\\$\\n]+?\\$)/);
       for (var i = 0; i < partes.length; i += 2) {
         if (partes[i]) {
-          partes[i] = partes[i].replace(cmdRegex, function(_, m) { return '$\\\\' + m + '$'; });
+          partes[i] = partes[i].replace(cmdRegex, function(_, m) { return '$' + bslash + m + '$'; });
         }
       }
       return partes.join('');
@@ -148,9 +150,10 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
 
     function processarNosDeTextoParaLatex(node) {
       if (!node) return;
+      const bslash = String.fromCharCode(92);
       if (node.nodeType === Node.TEXT_NODE) {
         const val = node.nodeValue;
-        if (val && (val.includes('\\') || val.includes('\t') || val.includes('\x0c') || val.includes('\x08') || val.includes('^|') || val.includes('_|'))) {
+        if (val && (val.indexOf(bslash) !== -1 || val.indexOf('\t') !== -1 || val.indexOf('\x0c') !== -1 || val.indexOf('\x08') !== -1 || val.indexOf('^|') !== -1 || val.indexOf('_|') !== -1)) {
           const modificado = prepararLatexSolto(val);
           if (modificado !== val) {
             node.nodeValue = modificado;
@@ -189,12 +192,13 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
         const rootEl = document.getElementById('simulador-root') || document.body;
         processarNosDeTextoParaLatex(rootEl);
         if (window.renderMathInElement) {
+          const bslash = String.fromCharCode(92);
           renderMathInElement(rootEl, {
             delimiters: [
               {left: '$$', right: '$$', display: true},
               {left: '$', right: '$', display: false},
-              {left: '\\(', right: '\\)', display: false},
-              {left: '\\[', right: '\\]', display: true}
+              {left: bslash + '(', right: bslash + ')', display: false},
+              {left: bslash + '[', right: bslash + ']', display: true}
             ],
             throwOnError: false
           });

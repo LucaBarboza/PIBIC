@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 let katex;
 const katexPaths = [
@@ -22,11 +23,13 @@ for (const p of katexPaths) {
 }
 
 if (!katex) {
-  console.error(JSON.stringify({
+  const errPayload = JSON.stringify({
     aprovado: false,
     total_formulas: 0,
+    total_erros: 1,
     erros: [{ caminho: 'system', erro: 'Pacote KaTeX não encontrado no ambiente Node.js' }]
-  }));
+  }, null, 2);
+  console.log(errPayload);
   process.exit(1);
 }
 
@@ -46,11 +49,13 @@ try {
   const raw = obterInput();
   inputData = JSON.parse(raw);
 } catch (err) {
-  console.error(JSON.stringify({
+  const parseErrPayload = JSON.stringify({
     aprovado: false,
     total_formulas: 0,
+    total_erros: 1,
     erros: [{ caminho: 'input', erro: 'Falha ao parsear JSON de entrada: ' + err.message }]
-  }));
+  }, null, 2);
+  console.log(parseErrPayload);
   process.exit(1);
 }
 
@@ -103,6 +108,36 @@ function inspecionarString(str, objPath) {
   }
 }
 
+function inspecionarHtmlSimulador(html, objPath) {
+  if (!html || typeof html !== 'string') return;
+
+  // 1. Auditoria Estrita de Sintaxe JavaScript dentro de tags <script>
+  const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+  let sMatch;
+  let sIdx = 0;
+  while ((sMatch = scriptRegex.exec(html)) !== null) {
+    sIdx++;
+    const code = sMatch[1];
+    if (!code || !code.trim()) continue;
+    try {
+      new vm.Script(code);
+    } catch (jsErr) {
+      erros.push({
+        caminho: `${objPath}.script[${sIdx}]`,
+        tipo: 'javascript_syntax',
+        formula: code.trim().slice(0, 120),
+        erro: `Erro de sintaxe no JavaScript do simulador: ${jsErr.message}`
+      });
+    }
+  }
+
+  // 2. Auditoria de Fórmulas KaTeX no corpo HTML (fora de <script> e <style>)
+  const htmlSemScripts = html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ');
+  inspecionarString(htmlSemScripts, `${objPath}.html_conteudo`);
+}
+
 function percorrerRecursivo(obj, objPath = 'root') {
   if (typeof obj === 'string') {
     inspecionarString(obj, objPath);
@@ -110,7 +145,11 @@ function percorrerRecursivo(obj, objPath = 'root') {
     obj.forEach((elem, idx) => percorrerRecursivo(elem, `${objPath}[${idx}]`));
   } else if (obj && typeof obj === 'object') {
     for (const k of Object.keys(obj)) {
-      if (k === 'codigo_html_gerado' || k === 'telemetria_custo') continue;
+      if (k === 'telemetria_custo') continue;
+      if (k === 'codigo_html_gerado') {
+        inspecionarHtmlSimulador(obj[k], `${objPath}.${k}`);
+        continue;
+      }
       percorrerRecursivo(obj[k], `${objPath}.${k}`);
     }
   }
