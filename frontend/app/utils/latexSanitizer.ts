@@ -3,6 +3,50 @@
  * Enforces 100% valid KaTeX / ReactMarkdown parsing across titles, boxes, and prose.
  */
 
+function balanceSetBraces(str: string): string {
+  if (!str || !str.includes('{')) return str;
+  let result = '';
+  let groupDepth = 0;
+  let openSetBraces = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+    const prev = i > 0 ? str[i - 1] : '';
+    const prev2 = i > 1 ? str[i - 2] : '';
+    const isEscaped = prev === '\\' && prev2 !== '\\';
+    if (char === '{') {
+      if (isEscaped) {
+        openSetBraces++;
+        result += '{';
+      } else {
+        groupDepth++;
+        result += '{';
+      }
+    } else if (char === '}') {
+      if (isEscaped) {
+        if (openSetBraces > 0) openSetBraces--;
+        result += '}';
+      } else {
+        if (groupDepth > 0) {
+          groupDepth--;
+          result += '}';
+        } else if (openSetBraces > 0) {
+          openSetBraces--;
+          result += '\\}';
+        } else {
+          result += '}';
+        }
+      }
+    } else {
+      result += char;
+    }
+  }
+  while (openSetBraces > 0) {
+    result += '\\}';
+    openSetBraces--;
+  }
+  return result;
+}
+
 function sanitizeDisplayMath(content: string): string {
   let c = content.trim();
 
@@ -31,6 +75,7 @@ function sanitizeDisplayMath(content: string): string {
   if (!c.includes('\\{')) {
     c = c.replace(/\\\}/g, '}');
   }
+  c = balanceSetBraces(c);
 
   // 5. Converte moedas dentro do math
   c = c.replace(/\\text\{R[\\\$]*\}/g, '\\text{R\\$}');
@@ -86,10 +131,10 @@ function sanitizeInlineMath(content: string): string {
   c = c.replace(/\\text\{US[\\\$]*\}/g, '\\text{US\\$}');
   c = c.replace(/([_^])\\\{/g, '$1{');
   c = c.replace(/\\text\{([^}]+)\\\}/g, '\\text{$1}');
-  c = c.replace(/\\text\{([^}]+)\}\\\}/g, '\\text{$1}}');
   if (!c.includes('\\{')) {
     c = c.replace(/\\\}/g, '}');
   }
+  c = balanceSetBraces(c);
   c = c.replace(/\\\\+/g, '\\');
   c = c.replace(/\\\s*$/g, '');
   return c.trim();

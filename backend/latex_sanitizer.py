@@ -1,6 +1,47 @@
 import re
 import json
 
+def balance_set_braces(s: str) -> str:
+    """Equilibra chaves literais de conjuntos \\{ com \\} sem interferir em chaves de grupos {...}."""
+    if not s or '{' not in s:
+        return s
+    result = []
+    group_depth = 0
+    open_set_braces = 0
+    length = len(s)
+    for i in range(length):
+        char = s[i]
+        prev = s[i - 1] if i > 0 else ''
+        prev2 = s[i - 2] if i > 1 else ''
+        is_escaped = (prev == '\\' and prev2 != '\\')
+        if char == '{':
+            if is_escaped:
+                open_set_braces += 1
+                result.append('{')
+            else:
+                group_depth += 1
+                result.append('{')
+        elif char == '}':
+            if is_escaped:
+                if open_set_braces > 0:
+                    open_set_braces -= 1
+                result.append('}')
+            else:
+                if group_depth > 0:
+                    group_depth -= 1
+                    result.append('}')
+                elif open_set_braces > 0:
+                    open_set_braces -= 1
+                    result.append(r'\}')
+                else:
+                    result.append('}')
+        else:
+            result.append(char)
+    while open_set_braces > 0:
+        result.append(r'\}')
+        open_set_braces -= 1
+    return ''.join(result)
+
 def sanitize_display_math(content: str) -> str:
     """Sanitiza o conteúdo interno de um bloco de Display Math ($$...$$)."""
     c = content.strip()
@@ -29,6 +70,7 @@ def sanitize_display_math(content: str) -> str:
     c = re.sub(r'\\text\{([^}]+)\}\\\}', r'\\text{\1}}', c)
     if r'\{' not in c:
         c = c.replace(r'\}', '}')
+    c = balance_set_braces(c)
     
     # 5. Converte moedas dentro do math
     c = re.sub(r'\\text\{R[\\\$]*\}', r'\\text{R\\$}', c)
@@ -75,6 +117,7 @@ def sanitize_inline_math(content: str) -> str:
     c = re.sub(r'\\text\{([^}]+)\}\\\}', r'\\text{\1}}', c)
     if r'\{' not in c:
         c = c.replace(r'\}', '}')
+    c = balance_set_braces(c)
     c = re.sub(r'\\\s*$', '', c)
     return c.strip()
 
