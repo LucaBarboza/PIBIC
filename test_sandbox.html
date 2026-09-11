@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script>
+    window.parentSecret = 'I AM PARENT';
+    window.renderMathInElement = function() { return 'PARENT_RENDER_MATH'; };
+  </script>
+</head>
+<body>
+  <iframe id="f1" sandbox="allow-scripts allow-same-origin" srcdoc="&lt;script&gt;
+    try {
+      var p = window.parent.parentSecret;
+      var rm = typeof window.parent.renderMathInElement;
+      document.write('CAN_ACCESS: ' + p + ' / ' + rm);
+    } catch(e) {
+      document.write('BLOCKED: ' + e.message);
+    }
+  &lt;/script&gt;"></iframe>
+  <div id="res"></div>
+  <script>
+    setTimeout(function() {
+      try {
+        var f = document.getElementById('f1');
+        var doc = f.contentDocument || f.contentWindow.document;
+        document.getElementById('res').innerText = doc.body.innerText;
+      } catch(e) {
+        document.getElementById('res').innerText = 'ERROR: ' + e.message;
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
