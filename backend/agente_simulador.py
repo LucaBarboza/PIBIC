@@ -184,13 +184,14 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
     }
 
     let renderizando = false;
-    function renderizarLatex() {
-      if (renderizando) return;
-      renderizando = true;
-      try {
-        const rootEl = document.getElementById('simulador-root') || document.body;
-        processarNosDeTextoParaLatex(rootEl);
-        if (window.renderMathInElement) {
+    function renderizarLatex(tentativas) {
+      tentativas = tentativas || 0;
+      if (typeof window.renderMathInElement === 'function') {
+        if (renderizando) return;
+        renderizando = true;
+        try {
+          const rootEl = document.getElementById('simulador-root') || document.body;
+          processarNosDeTextoParaLatex(rootEl);
           const bslash = String.fromCharCode(92);
           renderMathInElement(rootEl, {
             delimiters: [
@@ -199,19 +200,90 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
               {left: bslash + '(', right: bslash + ')', display: false},
               {left: bslash + '[', right: bslash + ']', display: true}
             ],
-            ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error"],
+            ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error", "plot-container", "plotly"],
+            ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option", "svg"],
             throwOnError: false
           });
+        } catch (err) {
+          console.warn('Erro na renderização KaTeX:', err);
+        } finally {
+          renderizando = false;
+          setTimeout(emitirAltura, 50);
+          setTimeout(emitirAltura, 200);
+          setTimeout(emitirAltura, 500);
         }
-      } catch (err) {
-        console.warn('Erro na renderização KaTeX:', err);
-      } finally {
-        renderizando = false;
-        setTimeout(emitirAltura, 50);
-        setTimeout(emitirAltura, 200);
-        setTimeout(emitirAltura, 500);
+      } else if (tentativas < 60) {
+        setTimeout(function() { renderizarLatex(tentativas + 1); }, 80);
       }
     }
+
+    // Interceptador global do Plotly para evitar sobreposição de títulos com legendas e formatar textos SVG
+    function interceptarPlotly() {
+      if (typeof window.Plotly !== 'undefined' && !window.__plotlyInterceptado) {
+        window.__plotlyInterceptado = true;
+        
+        function sanitizarTextoPlotly(str) {
+          if (typeof str !== 'string') return str;
+          return str
+            .replace(/\\$([A-Za-z]+)_\\{?([^}$]+)\\}?\\$/g, '$1<sub>$2</sub>')
+            .replace(/\\$([^$]+)\\$/g, '$1');
+        }
+
+        function ajustarLayoutETraces(data, layout) {
+          if (Array.isArray(data)) {
+            data.forEach(function(trace) {
+              if (trace && trace.name) trace.name = sanitizarTextoPlotly(trace.name);
+            });
+          }
+          if (layout) {
+            if (layout.title) {
+              if (typeof layout.title === 'string') layout.title = sanitizarTextoPlotly(layout.title);
+              else if (layout.title.text) layout.title.text = sanitizarTextoPlotly(layout.title.text);
+            }
+            if (layout.xaxis && layout.xaxis.title) {
+              if (typeof layout.xaxis.title === 'string') layout.xaxis.title = sanitizarTextoPlotly(layout.xaxis.title);
+              else if (layout.xaxis.title.text) layout.xaxis.title.text = sanitizarTextoPlotly(layout.xaxis.title.text);
+            }
+            if (layout.yaxis && layout.yaxis.title) {
+              if (typeof layout.yaxis.title === 'string') layout.yaxis.title = sanitizarTextoPlotly(layout.yaxis.title);
+              else if (layout.yaxis.title.text) layout.yaxis.title.text = sanitizarTextoPlotly(layout.yaxis.title.text);
+            }
+            
+            // Posiciona a legenda sempre na parte inferior com margem segura, eliminando colisão com o título
+            layout.legend = Object.assign({
+              orientation: 'h',
+              y: -0.22,
+              x: 0.5,
+              xanchor: 'center'
+            }, layout.legend || {});
+            if (layout.legend.y > 0.8) {
+              layout.legend.y = -0.22;
+              layout.legend.x = 0.5;
+              layout.legend.xanchor = 'center';
+              layout.legend.orientation = 'h';
+            }
+            layout.margin = Object.assign({ t: 50, b: 65, l: 60, r: 20 }, layout.margin || {});
+            layout.margin.t = Math.max(layout.margin.t || 0, 50);
+            layout.margin.b = Math.max(layout.margin.b || 0, 65);
+          }
+        }
+
+        var origReact = window.Plotly.react;
+        window.Plotly.react = function(gd, data, layout, config) {
+          ajustarLayoutETraces(data, layout);
+          return origReact.apply(this, arguments);
+        };
+
+        var origNewPlot = window.Plotly.newPlot;
+        window.Plotly.newPlot = function(gd, data, layout, config) {
+          ajustarLayoutETraces(data, layout);
+          return origNewPlot.apply(this, arguments);
+        };
+      } else if (!window.__plotlyInterceptado) {
+        setTimeout(interceptarPlotly, 50);
+      }
+    }
+    interceptarPlotly();
 
     // Observador contínuo de resize estritamente no container de conteúdo (NUNCA no document.body)
     if (window.ResizeObserver) {
@@ -224,29 +296,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       if (expEl) ro.observe(expEl);
     }
 
-    // Observador de mutações no DOM para detectar updates em explicacao_dinamica e controles
     window.addEventListener('DOMContentLoaded', () => {
-      const rootEl = document.getElementById('simulador-root');
-      if (rootEl && window.MutationObserver) {
-        let timerMutacao = null;
-        const mo = new MutationObserver((mutations) => {
-          const apenasKatex = mutations.every(m => {
-            const t = m.target;
-            return t && t.classList && (t.classList.contains('katex') || t.classList.contains('katex-html'));
-          });
-          if (apenasKatex) {
-            setTimeout(emitirAltura, 50);
-            return;
-          }
-
-          if (timerMutacao) clearTimeout(timerMutacao);
-          timerMutacao = setTimeout(() => {
-            renderizarLatex();
-            emitirAltura();
-          }, 30);
-        });
-        mo.observe(rootEl, { childList: true, characterData: true, subtree: true });
-      }
       renderizarLatex();
       emitirAltura();
     });
@@ -263,13 +313,18 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
   <script>
     __CODIGO_JAVASCRIPT_LOGICA__
 
-    // Inicialização segura com polling para aguardar Plotly carregar
+    // Inicialização segura com polling para aguardar Plotly e KaTeX carregarem
     function inicializarSimulacaoBlindada() {
-      if (typeof Plotly !== 'undefined' && typeof initSimulation === 'function') {
+      const prontoPlotly = typeof Plotly !== 'undefined';
+      const prontoInit = typeof initSimulation === 'function';
+      const prontoKatex = typeof window.renderMathInElement === 'function';
+
+      if (prontoPlotly && prontoInit && (prontoKatex || (window.__esperaCount || 0) > 40)) {
         initSimulation();
         renderizarLatex();
         setTimeout(emitirAltura, 150);
       } else {
+        window.__esperaCount = (window.__esperaCount || 0) + 1;
         setTimeout(inicializarSimulacaoBlindada, 50);
       }
     }
@@ -310,6 +365,14 @@ Conteúdo Teórico do Subtópico:
    - Quando o aluno mover um slider, a curva ou as barras devem mudar contra uma grade fixa e estável.
    - Use o layout claro acadêmico:
      `paper_bgcolor: '#ffffff'`, `plot_bgcolor: '#f8fafc'`, cor de fonte `#334155`, linhas de grade `#e2e8f0`.
+
+2.1. NUNCA SOBREPONHA O TÍTULO DO GRÁFICO COM A LEGENDA NO PLOTLY:
+   - Posicione a legenda SEMPRE na parte inferior do gráfico usando:
+     `legend: {{ orientation: 'h', y: -0.22, x: 0.5, xanchor: 'center' }}`
+     e margens seguras no layout:
+     `margin: {{ t: 50, b: 65, l: 60, r: 20 }}`
+   - JAMAIS posicione a legenda horizontal no topo (ex: `y: 1.15`), pois ela colide e sobrepõe o título!
+   - Em textos internos do Plotly (title, trace name, axis title), NUNCA use delimitadores de cifrão `$`. O SVG do Plotly aceita tags HTML nativas: use `A<sub>n,x</sub>`, `C<sub>n,x</sub>`, `(k = 3)`, `(x)` para evitar a exibição de cifrões crus no gráfico.
 
 3. ESTRUTURA DO HTML DOS CONTROLES (`painel_controles_html`):
    - Gere apenas os blocos de `<div class="space-y-1">` contendo:

@@ -87,34 +87,122 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
               window.parent.postMessage({ type: 'simulador_resize', height: finalH }, '*');
             }
           }
-          function reforcarRenderLatex() {
-            try {
-              if (typeof window.renderizarLatex === 'function') {
-                window.renderizarLatex();
-              } else if (window.renderMathInElement && document.getElementById('simulador-root')) {
-                var bslash = String.fromCharCode(92);
-                window.renderMathInElement(document.getElementById('simulador-root'), {
+
+          function executarKaTeXResiliente(tentativas) {
+            tentativas = tentativas || 0;
+            if (typeof window.renderMathInElement === 'function') {
+              var root = document.getElementById('simulador-root') || document.body;
+              var bslash = String.fromCharCode(92);
+              try {
+                window.renderMathInElement(root, {
                   delimiters: [
                     {left: '$$', right: '$$', display: true},
                     {left: '$', right: '$', display: false},
                     {left: bslash + '(', right: bslash + ')', display: false},
                     {left: bslash + '[', right: bslash + ']', display: true}
                   ],
-                  ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error"],
+                  ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error", "plot-container", "plotly"],
+                  ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option", "svg"],
                   throwOnError: false
                 });
-              }
-            } catch (e) {}
+              } catch (e) { console.warn('KaTeX render error:', e); }
+              recalcularAlturaSegura();
+            } else if (tentativas < 60) {
+              setTimeout(function() { executarKaTeXResiliente(tentativas + 1); }, 80);
+            }
           }
+
+          window.renderizarLatex = function() {
+            executarKaTeXResiliente();
+          };
+
+          // Intercepta Plotly para eliminar sobreposição de título com legenda e formatar texto limpo
+          function interceptarPlotly() {
+            if (typeof window.Plotly !== 'undefined' && !window.__plotlyInterceptado) {
+              window.__plotlyInterceptado = true;
+              
+              function sanitizarTextoPlotly(str) {
+                if (typeof str !== 'string') return str;
+                return str
+                  .replace(/\\$([A-Za-z]+)_\\{?([^}$]+)\\}?\\$/g, '$1<sub>$2</sub>')
+                  .replace(/\\$([^$]+)\\$/g, '$1');
+              }
+
+              function ajustarLayoutETraces(data, layout) {
+                if (Array.isArray(data)) {
+                  data.forEach(function(trace) {
+                    if (trace && trace.name) trace.name = sanitizarTextoPlotly(trace.name);
+                  });
+                }
+                if (layout) {
+                  if (layout.title) {
+                    if (typeof layout.title === 'string') layout.title = sanitizarTextoPlotly(layout.title);
+                    else if (layout.title.text) layout.title.text = sanitizarTextoPlotly(layout.title.text);
+                  }
+                  if (layout.xaxis && layout.xaxis.title) {
+                    if (typeof layout.xaxis.title === 'string') layout.xaxis.title = sanitizarTextoPlotly(layout.xaxis.title);
+                    else if (layout.xaxis.title.text) layout.xaxis.title.text = sanitizarTextoPlotly(layout.xaxis.title.text);
+                  }
+                  if (layout.yaxis && layout.yaxis.title) {
+                    if (typeof layout.yaxis.title === 'string') layout.yaxis.title = sanitizarTextoPlotly(layout.yaxis.title);
+                    else if (layout.yaxis.title.text) layout.yaxis.title.text = sanitizarTextoPlotly(layout.yaxis.title.text);
+                  }
+                  
+                  // Evita colisão entre título e legenda: posiciona na parte inferior com respiro
+                  layout.legend = Object.assign({
+                    orientation: 'h',
+                    y: -0.22,
+                    x: 0.5,
+                    xanchor: 'center'
+                  }, layout.legend || {});
+                  if (layout.legend.y > 0.8) {
+                    layout.legend.y = -0.22;
+                    layout.legend.x = 0.5;
+                    layout.legend.xanchor = 'center';
+                    layout.legend.orientation = 'h';
+                  }
+                  layout.margin = Object.assign({ t: 50, b: 65, l: 60, r: 20 }, layout.margin || {});
+                  layout.margin.t = Math.max(layout.margin.t || 0, 50);
+                  layout.margin.b = Math.max(layout.margin.b || 0, 65);
+                }
+              }
+
+              var origReact = window.Plotly.react;
+              window.Plotly.react = function(gd, data, layout, config) {
+                ajustarLayoutETraces(data, layout);
+                var res = origReact.apply(this, arguments);
+                setTimeout(recalcularAlturaSegura, 100);
+                return res;
+              };
+
+              var origNewPlot = window.Plotly.newPlot;
+              window.Plotly.newPlot = function(gd, data, layout, config) {
+                ajustarLayoutETraces(data, layout);
+                var res = origNewPlot.apply(this, arguments);
+                setTimeout(recalcularAlturaSegura, 100);
+                return res;
+              };
+            } else if (!window.__plotlyInterceptado) {
+              setTimeout(interceptarPlotly, 50);
+            }
+          }
+          interceptarPlotly();
+
           window.emitirAltura = recalcularAlturaSegura;
-          window.addEventListener('load', function() {
-            reforcarRenderLatex();
+
+          window.addEventListener('DOMContentLoaded', function() {
+            executarKaTeXResiliente();
             recalcularAlturaSegura();
-            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 150);
-            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 400);
-            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 800);
-            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 1500);
           });
+
+          window.addEventListener('load', function() {
+            executarKaTeXResiliente();
+            recalcularAlturaSegura();
+            setTimeout(function() { executarKaTeXResiliente(); recalcularAlturaSegura(); }, 200);
+            setTimeout(function() { executarKaTeXResiliente(); recalcularAlturaSegura(); }, 600);
+            setTimeout(function() { executarKaTeXResiliente(); recalcularAlturaSegura(); }, 1200);
+          });
+
           if (window.ResizeObserver) {
             var roSafe = new ResizeObserver(function() { recalcularAlturaSegura(); });
             if (document.body) roSafe.observe(document.body);
