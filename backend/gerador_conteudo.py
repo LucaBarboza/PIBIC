@@ -332,7 +332,7 @@ Sua missão é APROVEITAR 100% da riqueza teórica do rascunho anterior e APLICA
                     logger.update_agent(f"gerador_bruto_{idx+1}", "rodando", resposta=resposta_escritor.text)
                     logger.log(f"gerador_{idx+1}_{tentativa} terminou", "info")
                 
-                dados_escritor_dict = json.loads(resposta_escritor.text)
+                dados_escritor_dict = latex_sanitizer.safe_json_loads(resposta_escritor.text)
                 dados_escritor_dict = latex_sanitizer.sanitize_json_recursively(dados_escritor_dict)
                 
                 print(f"      [REVISOR] Analisando tópico {idx+1}...")

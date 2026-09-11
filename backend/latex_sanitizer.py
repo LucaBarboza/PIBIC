@@ -1,4 +1,5 @@
 import re
+import json
 
 def sanitize_display_math(content: str) -> str:
     """Sanitiza o conteúdo interno de um bloco de Display Math ($$...$$)."""
@@ -219,3 +220,33 @@ def sanitize_json_recursively(obj):
     elif isinstance(obj, list):
         return [sanitize_json_recursively(elem) for elem in obj]
     return obj
+
+def safe_json_loads(text: str):
+    """
+    Carrega JSON de forma ultra-resiliente contra sequências de escape do LaTeX,
+    como \\underline, \\upsilon (que quebram no json.loads padrão com 'Invalid \\uXXXX escape'),
+    além de comandos como \\frac, \\beta, \\text, \\times, etc.
+    """
+    if not text or not isinstance(text, str):
+        return {}
+    
+    # 1. Pré-tratamento de comandos LaTeX comuns que colidem com escapes JSON (\\u, \\f, \\b, \\t)
+    # \\u que não seja seguido de 4 dígitos hexadecimais (ex: \\underline, \\upsilon, \\url)
+    t = re.sub(r'(?<!\\)\\u(?![0-9a-fA-F]{4})', r'\\\\u', text)
+    t = re.sub(r'(?<!\\)\\f(rac|lat)', r'\\\\f\1', t)
+    t = re.sub(r'(?<!\\)\\b(eta|ar|inom|mathbf|boldsymbol|m|ig|igg|ullet)', r'\\\\b\1', t)
+    t = re.sub(r'(?<!\\)\\t(ext|imes|heta|au|op|iny|ilde)', r'\\\\t\1', t)
+    
+    try:
+        return json.loads(t)
+    except Exception:
+        pass
+    
+    # 2. Corrige qualquer outro backslash solto que não seja escape JSON válido
+    t = re.sub(r'(?<!\\)\\(?![\\"/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', t)
+    try:
+        return json.loads(t)
+    except Exception:
+        pass
+    
+    return json.loads(t, strict=False)

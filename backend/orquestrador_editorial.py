@@ -5,6 +5,7 @@ from google import genai
 from google.genai import types
 from schemas import AulaUnificadaELapidada
 from client_factory import get_genai_client
+from latex_sanitizer import safe_json_loads
 
 # ==============================================================================
 # FALLBACK DE SEGURANÇA PARA A CHAVE DE API (GEMINI_API_KEY)
@@ -91,7 +92,7 @@ def lapidar_conteudo_global(payload_bruto: dict, logger=None, modelo_llm: str = 
 
         print(" [OK] Aula unificada, referências compiladas no rodapé e livre de repetições!")
         
-        return json.loads(resposta.text)
+        return safe_json_loads(resposta.text)
 
     except Exception as e:
         print(f" [ERRO] Erro crítico no processo editorial: {e}")
@@ -122,7 +123,7 @@ def formatar_latex_final(aula_json: dict, client) -> dict:
             config=config_formatador
         )
         print(" [OK] LaTeX validado e formatado com sucesso!")
-        return json.loads(resposta_formatada.text)
+        return safe_json_loads(resposta_formatada.text)
     except Exception as e:
         print(f" [ERRO] Falha ao formatar LaTeX. Retornando a versão sem correção extra. Erro: {e}")
         return aula_json

@@ -324,7 +324,7 @@ Conteúdo Teórico do Subtópico:
 
 5. FORMATAÇÃO DE SÍMBOLOS MATEMÁTICOS E LATEX:
    - Envolva sempre letras gregas e fórmulas matemáticas entre cifrões `$ ... $` (ex: `($\\mu = 0.0$)`, `($\\sigma = 1.0$)`, `($\\mu \\pm 1\\sigma$)`, `$f(x)$`).
-   - Use SEMPRE chaves completas `{}` em expoentes e subscritos compostos (ex: `\\phi^{{|h|}}` e JAMAIS `\\phi^|h|`; `e^{{-x}}` e JAMAIS `e^-x`; `X_{{t+1}}`).
+   - Use SEMPRE chaves completas {{}} em expoentes e subscritos compostos (ex: `\\phi^{{|h|}}` e JAMAIS `\\phi^|h|`; `e^{{-x}}` e JAMAIS `e^-x`; `X_{{t+1}}`).
    - Não use quebras literais de texto sem tags HTML (`<br>` ou `<p>`).
 
 Retorne estritamente o JSON estruturado conforme o schema.

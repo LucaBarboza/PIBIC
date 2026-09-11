@@ -75,7 +75,7 @@ def gerar_caderno_exercicios(conteudo_aula_json: dict, logger=None, modelo_llm="
         )
         
         import latex_sanitizer
-        caderno_dict = json.loads(resposta.text)
+        caderno_dict = latex_sanitizer.safe_json_loads(resposta.text)
         caderno_dict = latex_sanitizer.sanitize_json_recursively(caderno_dict)
         
         if logger:
