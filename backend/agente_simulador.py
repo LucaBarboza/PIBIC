@@ -349,7 +349,7 @@ Conteúdo Teórico do Subtópico:
      * Em vez de `<option>Densidade $f(x)$</option>`, use `<option>Densidade f(x)</option>`.
      * Em vez de `<option>Segunda Derivada $f''(x)$</option>`, use `<option>Segunda Derivada f''(x)</option>`.
      * Em vez de `<option>Manter $k$ elementos juntos</option>`, use `<option>Manter k elementos juntos</option>`.
-     * Em vez de `<option>Logarítmica ($\\log_{10}$)</option>`, use `<option>Logarítmica (log₁₀)</option>`.
+     * Em vez de `<option>Logarítmica ($\\log_{{10}}$)</option>`, use `<option>Logarítmica (log₁₀)</option>`.
    - Nos rótulos de sliders (`label`), use notação limpa como `Número Total de Elementos (n):` ou `Elementos com Restrição (k):`.
    - Em strings de JavaScript atribuídas a `innerHTML` (ex: `explicacao_dinamica.innerHTML`), NUNCA use `<` ou `>` soltos dentro de fórmulas KaTeX. Use `\\lt` e `\\gt` (ex: `$f''(x) \\lt 0$` e `$f''(x) \\gt 0$`) para não corromper o parser HTML do navegador.
 
