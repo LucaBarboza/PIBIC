@@ -111,37 +111,45 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       if (texto.includes('katex-html') || texto.includes('katex-display')) return texto;
 
       let res = texto;
-      
       const bslash = String.fromCharCode(92);
-      
-      // 1. Recupera escapes de caracteres de controle e tabs corrompidos
+
+      // 1. Limpa qualquer acúmulo residual de \\f repetidos ou \\f antes de \\frac
+      res = res.replace(/(?:\\f){2,}/g, bslash + 'f');
+      res = res.replace(/\\f(?=\\frac)/g, '');
+
+      // 2. Recupera escapes de caracteres de controle e tabs corrompidos
       res = res
         .replace(/[\x0c\u000c]rac/g, bslash + 'frac')
         .replace(/[\x08\u0008]ar\\{/g, bslash + 'bar{')
         .replace(/[\x08\u0008]eta/g, bslash + 'beta')
         .replace(/[\x08\u0008]inom/g, bslash + 'binom')
         .replace(/[\x08\u0008]mathbf/g, bslash + 'mathbf')
-        .replace(/\t(ext|au|heta|imes)/g, bslash + '$1')
-        .replace(/(?<![\\f\x0c\u000c])rac\\{/g, bslash + 'frac{');
+        .replace(/\t(ext|au|heta|imes)/g, bslash + '$1');
 
-      // 2. Corrige potências e subscritos compostos sem chaves (ex: phi^|h| -> phi^{|h|}, e^-x -> e^{-x})
+      // 3. Corrige potências e subscritos compostos sem chaves (ex: phi^|h| -> phi^{|h|})
       res = res
         .replace(/\\^\\|([^|]+)\\|/g, '^{|$1|}')
         .replace(/_\\|([^|]+)\\|/g, '_{|$1|}');
 
-      // 3. Parênteses contendo expressões matemáticas como (mu), (sigma = 1.0)
-      res = res.replace(/\\(([^)]*\\\\(?:mu|sigma|alpha|beta|theta|lambda|pi|gamma|delta|phi|omega|tau|rho|hat|bar|pm|approx|leq|geq|cdot)[^)]*)\\)/g, function(match, interior) {
+      // 4. Parênteses contendo expressões matemáticas como (\\frac{...}{...} = 0.8163) ou (\\mu)
+      res = res.replace(/\\(([^)]*\\\\(?:frac|dfrac|tfrac|sqrt|mu|sigma|alpha|beta|theta|lambda|pi|gamma|delta|phi|omega|tau|rho|hat|bar|pm|approx|leq|geq|cdot)[^)]*)\\)/g, function(match, interior) {
         var limpo = interior.trim();
         if (limpo.startsWith('$') && limpo.endsWith('$')) return match;
         return '($' + limpo + '$)';
       });
 
-      // 4. Comandos LaTeX soltos restantes (que não estão em $...$)
+      // 5. Frações, raízes e comandos soltos fora de $...$
       var cmdRegex = /(?<![\\$a-zA-Z0-9])\\\\(mu|sigma|alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|iota|kappa|lambda|nu|xi|pi|varpi|rho|varrho|varsigma|tau|upsilon|phi|varphi|chi|psi|omega|Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega|pm|mp|cdot|times|approx|neq|ne|leq|geq|le|ge|infty|forall|exists|partial|nabla)(?![a-zA-Z0-9])/g;
 
       var partes = res.split(/(\\$\\$[\\s\\S]*?\\$\\$|\\$[^\\$\\n]+?\\$)/);
       for (var i = 0; i < partes.length; i += 2) {
         if (partes[i]) {
+          partes[i] = partes[i].replace(/\\\\(frac|dfrac|tfrac)\\{([^{}]+)\\}\\{([^{}]+)\\}/g, function(_, cmd, n, d) {
+            return '$' + bslash + cmd + '{' + n + '}{' + d + '}$';
+          });
+          partes[i] = partes[i].replace(/\\\\sqrt\\{([^{}]+)\\}/g, function(_, arg) {
+            return '$' + bslash + 'sqrt{' + arg + '}$';
+          });
           partes[i] = partes[i].replace(cmdRegex, function(_, m) { return '$' + bslash + m + '$'; });
         }
       }
@@ -161,7 +169,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
         }
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         const tag = node.tagName.toLowerCase();
-        if (tag === 'script' || tag === 'style' || tag === 'input' || tag === 'select' || (node.classList && (node.classList.contains('katex') || node.classList.contains('katex-html')))) {
+        if (tag === 'script' || tag === 'style' || tag === 'input' || tag === 'select' || (node.classList && (node.classList.contains('katex') || node.classList.contains('katex-html') || node.classList.contains('katex-mathml')))) {
           return;
         }
         Array.from(node.childNodes).forEach(child => processarNosDeTextoParaLatex(child));
@@ -175,7 +183,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       const hBody = document.body ? Math.ceil(document.body.scrollHeight || 0) : 0;
       const hDoc = document.documentElement ? Math.ceil(document.documentElement.scrollHeight || 0) : 0;
       const hContent = Math.max(hRoot, hBody, hDoc, 500);
-      const alturaFinal = Math.min(Math.max(hContent + 40, 500), 1600);
+      const alturaFinal = Math.min(Math.max(hContent + 50, 580), 2000);
 
       if (Math.abs(alturaFinal - lastSentHeight) >= 3) {
         lastSentHeight = alturaFinal;
@@ -203,6 +211,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       }
       if (renderizando) return;
       renderizando = true;
+      window.__isRenderingLatex = true;
       try {
         const rootEl = document.getElementById('simulador-root') || document.body;
         processarNosDeTextoParaLatex(rootEl);
@@ -223,6 +232,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
         console.warn('Erro na renderização KaTeX:', err);
       } finally {
         renderizando = false;
+        window.__isRenderingLatex = false;
         setTimeout(emitirAltura, 40);
         setTimeout(emitirAltura, 150);
         setTimeout(emitirAltura, 400);
@@ -242,13 +252,15 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
 
     // Observador de mutações no DOM para detectar updates em explicacao_dinamica e controles
     window.addEventListener('DOMContentLoaded', () => {
+      const expEl = document.getElementById('explicacao_dinamica');
       const rootEl = document.getElementById('simulador-root');
-      if (rootEl && window.MutationObserver) {
+      if (window.MutationObserver) {
         let timerMutacao = null;
         const mo = new MutationObserver((mutations) => {
+          if (window.__isRenderingLatex) return;
           const apenasKatex = mutations.every(m => {
             const t = m.target;
-            return t && t.classList && (t.classList.contains('katex') || t.classList.contains('katex-html'));
+            return t && t.classList && (t.classList.contains('katex') || t.classList.contains('katex-html') || t.classList.contains('katex-mathml'));
           });
           if (apenasKatex) {
             setTimeout(emitirAltura, 50);
@@ -259,9 +271,15 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
           timerMutacao = setTimeout(() => {
             renderizarLatex();
             emitirAltura();
-          }, 30);
+          }, 40);
         });
-        mo.observe(rootEl, { childList: true, characterData: true, subtree: true });
+
+        if (expEl) {
+          mo.observe(expEl, { childList: true, subtree: true, characterData: true });
+        }
+        if (rootEl) {
+          mo.observe(rootEl, { childList: true, subtree: false });
+        }
       }
       renderizarLatex();
       emitirAltura();
@@ -285,13 +303,39 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
   <script>
     __CODIGO_JAVASCRIPT_LOGICA__
 
+    // Hook no Plotly para recalcular altura e redimensionar gráficos automaticamente
+    function hookPlotlyResize() {
+      if (typeof Plotly !== 'undefined' && !window.__plotlyHooked) {
+        window.__plotlyHooked = true;
+        ['newPlot', 'react', 'relayout', 'redraw'].forEach(function(fn) {
+          if (typeof Plotly[fn] === 'function') {
+            var orig = Plotly[fn];
+            Plotly[fn] = function() {
+              var res = orig.apply(this, arguments);
+              if (res && typeof res.then === 'function') {
+                res.then(function() {
+                  setTimeout(emitirAltura, 50);
+                  setTimeout(emitirAltura, 200);
+                });
+              } else {
+                setTimeout(emitirAltura, 100);
+              }
+              return res;
+            };
+          }
+        });
+      }
+    }
+
     // Inicialização segura com polling para aguardar Plotly carregar
     function inicializarSimulacaoBlindada() {
       if (typeof Plotly !== 'undefined' && typeof initSimulation === 'function') {
+        hookPlotlyResize();
         initSimulation();
         renderizarLatex();
         setTimeout(renderizarLatex, 100);
         setTimeout(emitirAltura, 150);
+        setTimeout(emitirAltura, 500);
       } else {
         setTimeout(inicializarSimulacaoBlindada, 50);
       }
@@ -302,6 +346,16 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
     } else {
       inicializarSimulacaoBlindada();
     }
+
+    window.addEventListener('resize', function() {
+      if (typeof Plotly !== 'undefined' && typeof Plotly.Plots !== 'undefined') {
+        var g = document.getElementById('grafico');
+        if (g) {
+          try { Plotly.Plots.resize(g); } catch(e) {}
+        }
+      }
+      emitirAltura();
+    });
   </script>
 </body>
 </html>
@@ -507,7 +561,9 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, contexto_subtopico
                 r'quad|qquad|left|right|big|Big|bigg|Bigg|middle'
             )
             # 3. Recupera caracteres de controle gerados por escape no JSON
-            codigo_js = codigo_js.replace('\x0c', r'\f').replace('\x08', r'\b')
+            codigo_js = codigo_js.replace('\x0crac', r'\frac').replace('\x0c', r'\f').replace('\x08', r'\b')
+            codigo_js = re.sub(r'(?:\\f){2,}', r'\\f', codigo_js)
+            codigo_js = re.sub(r'\\f(?=\\frac)', '', codigo_js)
             codigo_js = re.sub(r'\t(ext|au|heta|imes)', r'\\t\1', codigo_js)
             # 4. Corrige potências e subscritos sem chaves (ex: \phi^|h| -> \phi^{|h|}, _|h| -> _{|h|})
             codigo_js = re.sub(r'\^\|([^|]+)\|', r'^{|\1|}', codigo_js)
@@ -517,6 +573,9 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, contexto_subtopico
 
         codigo_js_sanitizado = sanitizar_js_latex(comp.codigo_javascript_logica.strip())
         explicacao_sanitizada = comp.explicacao_inicial.strip().replace(r'\n\n', '\n\n').replace(r'\n', '\n')
+        explicacao_sanitizada = explicacao_sanitizada.replace('\x0crac', r'\frac').replace('\x0c', r'\f')
+        explicacao_sanitizada = re.sub(r'(?:\\f){2,}', r'\\f', explicacao_sanitizada)
+        explicacao_sanitizada = re.sub(r'\\f(?=\\frac)', '', explicacao_sanitizada)
 
         # Injeta componentes no template pré-pronto fixo de forma segura (sem format/KeyError)
         html_final = (

@@ -213,9 +213,11 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
             var root = document.getElementById('simulador-root');
             if (!root) return;
             var hRoot = Math.ceil(root.getBoundingClientRect().height || root.offsetHeight || 0);
-            if (!hRoot || hRoot < 300) return;
-            var finalH = Math.min(Math.max(hRoot + 30, 580), 1400);
-            if (Math.abs(finalH - (window.__lastSentSafeH || 0)) >= 8) {
+            var hBody = document.body ? Math.ceil(document.body.scrollHeight || 0) : 0;
+            var hMax = Math.max(hRoot, hBody);
+            if (!hMax || hMax < 300) return;
+            var finalH = Math.min(Math.max(hMax + 50, 580), 2000);
+            if (Math.abs(finalH - (window.__lastSentSafeH || 0)) >= 6) {
               window.__lastSentSafeH = finalH;
               window.parent.postMessage({ type: 'simulador_resize', height: finalH }, '*');
             }
@@ -415,7 +417,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
         setExplicacaoDinamica(htmlToMarkdown(event.data.texto));
       }
       if (event.data && (event.data.type === 'simulador_resize' || event.data.type === 'resize') && event.data.height) {
-        const h = Math.min(Math.max(Number(event.data.height), 580), 1400);
+        const h = Math.min(Math.max(Number(event.data.height), 580), 2000);
         setIframeHeight(h);
       }
     };

@@ -248,8 +248,10 @@ def sanitizar_layout_e_renderizacao_simulador(html: str) -> str:
 
     h = html
 
-    # 0. Recuperação de acentuação corrompida em simuladores legados
-    h = h.replace('\x0c', '\\f').replace('\x08', '\\b')
+    # 0. Recuperação de acentuação e escapes corrompidos em simuladores legados
+    h = h.replace('\x0crac', '\\frac').replace('\x0c', '\\f').replace('\x08', '\\b')
+    h = re.sub(r'(?:\\f){2,}', r'\\f', h)
+    h = re.sub(r'\\f(?=\\frac)', '', h)
     h = h.replace('̢', '')  # Remove caractere espúrio U+0322
     reparos_acentos = [
         ("Combinaes", "Combinações"),
@@ -413,6 +415,7 @@ def sanitizar_layout_e_renderizacao_simulador(html: str) -> str:
       }
       if (renderizando) return;
       renderizando = true;
+      window.__isRenderingLatex = true;
       try {
         var rootEl = document.getElementById('simulador-root') || document.body;
         if (typeof processarNosDeTextoParaLatex === 'function') {
@@ -428,13 +431,14 @@ def sanitizar_layout_e_renderizacao_simulador(html: str) -> str:
             {left: bslash + '(', right: bslash + ')', display: false},
             {left: bslash + '[', right: bslash + ']', display: true}
           ],
-          ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error"],
+          ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error", "katex-ignore", "sem-katex"],
           throwOnError: false
         });
       } catch (err) {
         console.warn('Erro na renderização KaTeX:', err);
       } finally {
         renderizando = false;
+        window.__isRenderingLatex = false;
         if (typeof emitirAltura === 'function') {
           setTimeout(emitirAltura, 40);
           setTimeout(emitirAltura, 150);
@@ -458,22 +462,29 @@ def sanitizar_layout_e_renderizacao_simulador(html: str) -> str:
     if "MutationObserver" not in h and "</body>" in h:
         script_mo = """<script>
     window.addEventListener('DOMContentLoaded', () => {
+      const expEl = document.getElementById('explicacao_dinamica');
       const rootEl = document.getElementById('simulador-root');
-      if (rootEl && window.MutationObserver) {
+      if (window.MutationObserver) {
         let timerMutacao = null;
         const mo = new MutationObserver((mutations) => {
+          if (window.__isRenderingLatex) return;
           const apenasKatex = mutations.every(m => {
             const t = m.target;
-            return t && t.classList && (t.classList.contains('katex') || t.classList.contains('katex-html'));
+            return t && t.classList && (t.classList.contains('katex') || t.classList.contains('katex-html') || t.classList.contains('katex-mathml'));
           });
           if (apenasKatex) return;
           if (timerMutacao) clearTimeout(timerMutacao);
           timerMutacao = setTimeout(() => {
             if (typeof renderizarLatex === 'function') renderizarLatex();
             if (typeof emitirAltura === 'function') emitirAltura();
-          }, 30);
+          }, 40);
         });
-        mo.observe(rootEl, { childList: true, characterData: true, subtree: true });
+        if (expEl) {
+          mo.observe(expEl, { childList: true, subtree: true, characterData: true });
+        }
+        if (rootEl) {
+          mo.observe(rootEl, { childList: true, subtree: false });
+        }
       }
     });
     </script>"""
