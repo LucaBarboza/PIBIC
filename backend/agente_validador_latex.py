@@ -234,18 +234,109 @@ REGRAS RÍGIDAS DE CORREÇÃO:
             time.sleep(2)
             
     print(" [AVISO] Mantendo versão sanitizada determinística.")
-    return aula_sanitizada
+def reparar_simulador_com_agente(simulador: dict, erros_simulador: list, logger=None, target_model="gemini-3.5-flash-lite", tracker=None) -> dict:
+    """
+    Envia o código HTML do simulador com defeito e o diagnóstico do compilador KaTeX/Node.js
+    para o Agente de IA (Gemini) reparar cirurgicamente erros de sintaxe JS e fórmulas LaTeX.
+    """
+    if not simulador or not isinstance(simulador, dict):
+        return simulador
+        
+    html_original = simulador.get("codigo_html_gerado", "")
+    if not html_original or not isinstance(html_original, str):
+        return simulador
+        
+    nome_sim = simulador.get("nome_simulador", "Simulador Interativo")
+    print(f"   -> [AGENTE SIMULADOR] Reparando com IA '{nome_sim}' ({len(erros_simulador)} anomalias apontadas pelo KaTeX)...", flush=True)
+    if logger:
+        logger.log(f"Validador LaTeX: Agente IA reparando simulador '{nome_sim}' com feedback do KaTeX...", "info")
+
+    try:
+        client = get_genai_client()
+    except Exception as e:
+        print(f" [AVISO] Falha ao obter Gemini Client para o simulador: {e}")
+        return simulador
+
+    # Sanitização rápida determinística preliminar
+    html_limpo_base = (html_original
+        .replace("val.includes('^{|') |}|", "val.indexOf('^|') !== -1")
+        .replace("val.includes('\\')", "val.indexOf(String.fromCharCode(92)) !== -1")
+        .replace("val.includes('\\\\')", "val.indexOf(String.fromCharCode(92)) !== -1")
+        .replace("val.includes('\t')", "val.indexOf('\\t') !== -1")
+        .replace("val.includes('\x0c')", "val.indexOf('\\x0c') !== -1")
+        .replace("val.includes('\x08')", "val.indexOf('\\x08') !== -1")
+        .replace('\x080', '\\beta_0').replace('\x081', '\\beta_1').replace('\x08\\sigma', '\\sigma').replace('\x08eta', '\\beta')
+        .replace('̷\\mu', '\\mu').replace('̷\\sigma', '\\sigma')
+    )
+
+    prompt = f"""
+Você é o Engenheiro Especialista em Frontend Acadêmico e Tipografia KaTeX do PIBIC.
+O compilador KaTeX/Node.js identificou anomalias críticas no código HTML/JavaScript do simulador interativo abaixo:
+Simulador: "{nome_sim}"
+
+[ANOMALIAS REPORTADAS PELO COMPILADOR KATEX]:
+{json.dumps(erros_simulador, indent=2, ensure_ascii=False)}
+
+[CÓDIGO ATUAL DO SIMULADOR]:
+{html_limpo_base}
+
+REGRAS RÍGIDAS DE CORREÇÃO:
+1. Sintaxe JavaScript Impecável: Corrija qualquer erro de sintaxe, string não fechada, chaves ou parênteses faltando no JavaScript.
+2. KaTeX 100% Compilável: Envolva toda e qualquer fórmula matemática ou símbolo estatístico no HTML ou nas strings dinâmicas de JS com delimitadores válidos: $...$ (inline) ou $$...$$ (display).
+3. Nunca deixe comandos LaTeX soltos como \\frac, \\binom, \\mu, \\sigma sem os delimitadores $...$.
+4. Mantenha intacta a estrutura do simulador: CDN Tailwind, Plotly.js, KaTeX auto-render, painel de controles e o envio da altura via window.parent.postMessage({{ type: 'simulador_resize', height: ... }}, '*').
+5. Responda APENAS com o código HTML completo corrigido, iniciando em <!DOCTYPE html> e finalizando em </html>. NÃO inclua blocos markdown (```html) ou explicações adicionais fora do HTML.
+"""
+    try:
+        t0 = time.time()
+        resp = client.models.generate_content(
+            model=target_model,
+            contents=prompt
+        )
+        t_elap = time.time() - t0
+        if tracker and target_model:
+            try:
+                tracker.registrar_chamada(
+                    nome_agente="Validador_LaTeX_Simulador",
+                    modelo=target_model,
+                    response=resp,
+                    tempo_s=t_elap
+                )
+            except Exception:
+                pass
+                
+        texto_resp = resp.text.strip() if resp and resp.text else ""
+        if texto_resp.startswith("```"):
+            texto_resp = re.sub(r'^```[a-zA-Z]*\n?', '', texto_resp)
+            texto_resp = re.sub(r'\n?```$', '', texto_resp)
+        texto_resp = texto_resp.strip()
+        
+        if "<!DOCTYPE html>" in texto_resp or "<html" in texto_resp:
+            simulador["codigo_html_gerado"] = texto_resp
+            print(f"   -> [AGENTE SIMULADOR] Código do simulador '{nome_sim}' curado pela IA com sucesso!")
+            if logger:
+                logger.log(f"Validador LaTeX: Simulador '{nome_sim}' curado com sucesso pela IA.", "success")
+        else:
+            print("   -> [AVISO] Resposta da IA para o simulador não continha HTML válido. Mantendo base sanitizada.")
+            simulador["codigo_html_gerado"] = html_limpo_base
+    except Exception as err:
+        print(f"   -> [AVISO] Falha na chamada da IA para o simulador: {err}. Usando base sanitizada.")
+        simulador["codigo_html_gerado"] = html_limpo_base
+
+    return simulador
 
 def validar_e_corrigir_aula_completa(aula_json: dict, logger=None, modelo_llm: str = "hibrido", tracker=None) -> dict:
     """
     Agente Validador e Auditor Final com Loop de Auto-Cura (KaTeX Real + Node.js).
     Ciclo:
       1. Sanitização determinística instantânea (< 1ms).
-      2. Compilação estrita com o motor real do KaTeX.
+      2. Compilação estrita com o motor real do KaTeX em teoria, exercícios e simuladores.
       3. Se 0 erros -> Aprovado imediatamente!
-      4. Se houver erros -> Reparo cirúrgico com feedback exato do KaTeX para o LLM.
+      4. Se houver erros -> Reparo cirúrgico:
+         - Teoria/Exercícios: LLM com feedback exato de cada fórmula.
+         - Simuladores: Agente de IA com código HTML + diagnóstico do KaTeX/JS.
       5. Re-compilação no KaTeX para atestar o sucesso (até 2 iterações).
-      6. Fallback final seguro para blindar a interface do usuário.
+      6. Blindagem final idempotente.
     """
     if not aula_json or not isinstance(aula_json, dict):
         return aula_json
@@ -285,24 +376,54 @@ def validar_e_corrigir_aula_completa(aula_json: dict, logger=None, modelo_llm: s
                 
             print(f"   -> [KATEX REAL - CICLO {ciclo + 1}] Detectadas {total_erros} falhas de compilação em {total_formulas} fórmulas.")
             if logger:
-                logger.log(f"Validador LaTeX: {total_erros} falha(s) de compilação no ciclo {ciclo + 1}. Reparando...", "warning")
+                logger.log(f"Validador LaTeX: {total_erros} falha(s) de compilação no ciclo {ciclo + 1}. Reparando com IA...", "warning")
                 
-            anomalias_formatadas = []
-            for idx_e, e in enumerate(erros[:8]):
-                anomalias_formatadas.append({
-                    "id": idx_e + 1,
-                    "caminho_campo": e.get("caminho", "desconhecido"),
-                    "erro_detectado": e.get("erro", "Erro KaTeX"),
-                    "trecho_original": e.get("formula", "")
-                })
+            anomalias_teoria = []
+            erros_por_simulador = {}
+
+            for e in erros:
+                caminho = e.get("caminho", "")
+                m = re.search(r'simuladores(?:_da_aula)?\[(\d+)\]', caminho)
+                if m:
+                    s_idx = int(m.group(1))
+                    erros_por_simulador.setdefault(s_idx, []).append(e)
+                else:
+                    anomalias_teoria.append(e)
+
+            # Repara conteúdo teórico e deduções com o LLM
+            if anomalias_teoria:
+                anomalias_formatadas = []
+                for idx_e, e in enumerate(anomalias_teoria[:8]):
+                    anomalias_formatadas.append({
+                        "id": idx_e + 1,
+                        "caminho_campo": e.get("caminho", "desconhecido"),
+                        "erro_detectado": e.get("erro", "Erro KaTeX"),
+                        "trecho_original": e.get("formula", "")
+                    })
+                aula_atual = reparar_anomalias_cirurgico(
+                    aula_atual,
+                    anomalias_formatadas,
+                    logger=logger,
+                    target_model=target_model,
+                    tracker=tracker
+                )
+
+            # Repara simuladores com o Agente de IA
+            if erros_por_simulador:
+                sims = aula_atual.get("simuladores_da_aula")
+                if sims is None and "conteudo_json" in aula_atual:
+                    sims = aula_atual["conteudo_json"].get("simuladores_da_aula")
                 
-            aula_atual = reparar_anomalias_cirurgico(
-                aula_atual,
-                anomalias_formatadas,
-                logger=logger,
-                target_model=target_model,
-                tracker=tracker
-            )
+                if isinstance(sims, list):
+                    for s_idx, s_erros in erros_por_simulador.items():
+                        if 0 <= s_idx < len(sims):
+                            sims[s_idx] = reparar_simulador_com_agente(
+                                sims[s_idx],
+                                s_erros,
+                                logger=logger,
+                                target_model=target_model,
+                                tracker=tracker
+                            )
             
         # Pós-loop
         relatorio_final = compilar_katex_real(aula_atual)

@@ -207,13 +207,17 @@ def sanitize_json_recursively(obj):
         for k, v in obj.items():
             if k == "codigo_html_gerado":
                 if isinstance(v, str):
-                    res[k] = (v
-                        .replace("val.includes('\\')", "val.indexOf(String.fromCharCode(92)) !== -1")
-                        .replace("val.includes('\\\\')", "val.indexOf(String.fromCharCode(92)) !== -1")
-                        .replace("val.includes('\t')", "val.indexOf('\\t') !== -1")
-                        .replace("val.includes('\x0c')", "val.indexOf('\\x0c') !== -1")
-                        .replace("val.includes('\x08')", "val.indexOf('\\x08') !== -1")
-                    )
+                    h = v.replace("val.includes('^{|') |}|", "val.indexOf('^|') !== -1")
+                    h = h.replace("val.includes('\\')", "val.indexOf(String.fromCharCode(92)) !== -1")
+                    h = h.replace("val.includes('\\\\')", "val.indexOf(String.fromCharCode(92)) !== -1")
+                    h = h.replace("val.includes('\t')", "val.indexOf('\\t') !== -1")
+                    h = h.replace("val.includes('\x0c')", "val.indexOf('\\x0c') !== -1")
+                    h = h.replace("val.includes('\x08')", "val.indexOf('\\x08') !== -1")
+                    # Recupera escapes corrompidos em strings LaTeX do simulador
+                    h = h.replace('\x080', '\\beta_0').replace('\x081', '\\beta_1').replace('\x08\\sigma', '\\sigma').replace('\x08eta', '\\beta')
+                    h = h.replace('̷\\mu', '\\mu').replace('̷\\sigma', '\\sigma')
+                    h = re.sub(r'\^\\+(circ|degree|prime)', r'^{\\\1}', h)
+                    res[k] = h
                 else:
                     res[k] = v
             elif k == "telemetria_custo":

@@ -111,7 +111,17 @@ function inspecionarString(str, objPath) {
 function inspecionarHtmlSimulador(html, objPath) {
   if (!html || typeof html !== 'string') return;
 
-  // 1. Auditoria Estrita de Sintaxe JavaScript dentro de tags <script>
+  // 1. Detecção de caracteres de controle corrompidos que quebram LaTeX (\beta -> \x08eta, \frac -> \x0crac)
+  if (/[\x08\x0c\u0008\u000c]/.test(html)) {
+    erros.push({
+      caminho: `${objPath}.corrupcao_caracteres`,
+      tipo: 'corrupted_control_char',
+      formula: 'Caracteres de controle corrompidos (ex: \\x08 / backspace em \\beta)',
+      erro: 'O código do simulador contém caracteres de escape corrompidos (como \\x08 ou \\x0c) que impedem compilação KaTeX.'
+    });
+  }
+
+  // 2. Auditoria Estrita de Sintaxe JavaScript dentro de tags <script>
   const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
   let sMatch;
   let sIdx = 0;
@@ -129,13 +139,45 @@ function inspecionarHtmlSimulador(html, objPath) {
         erro: `Erro de sintaxe no JavaScript do simulador: ${jsErr.message}`
       });
     }
+
+    // Inspeciona fórmulas dentro de strings/templates no JavaScript (neutraliza interpolação ${...})
+    const stringRegex = /`([\s\S]*?)`|'([^'\n]*)'|"([^"\n]*)"/g;
+    let strMatch;
+    while ((strMatch = stringRegex.exec(code)) !== null) {
+      let lit = strMatch[1] || strMatch[2] || strMatch[3];
+      if (lit && (lit.includes('$') || lit.includes('\\\\') || lit.includes('\\(') || lit.includes('\\['))) {
+        // Substitui interpolações ${...} de template strings JS por um termo neutro para não corromper fórmulas KaTeX
+        lit = lit.replace(/\$\{[^}]+\}/g, '1');
+        inspecionarString(lit, `${objPath}.script_strings`);
+      }
+    }
   }
 
-  // 2. Auditoria de Fórmulas KaTeX no corpo HTML (fora de <script> e <style>)
+  // 3. Auditoria de Fórmulas KaTeX no corpo HTML (fora de <script> e <style>)
   const htmlSemScripts = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ');
   inspecionarString(htmlSemScripts, `${objPath}.html_conteudo`);
+
+  // 4. Detecção de macros matemáticas LaTeX soltas (sem delimitadores $, $$, \( ou \[)
+  // Remove primeiro as fórmulas matemáticas delimitadas para que operadores como < ou > não sejam confundidos com tags HTML
+  const textoPuro = htmlSemScripts
+    .replace(/\$\$[\s\S]*?\$\$/g, ' ')
+    .replace(/(?<!\$)\$[^\$\n]+?\$(?!\$)/g, ' ')
+    .replace(/\\\([\s\S]*?\\\)/g, ' ')
+    .replace(/\\\[[\s\S]*?\\\]/g, ' ')
+    .replace(/<[^>]+>/g, ' ');
+  const macroSoltaRegex = /\\(frac|binom|sqrt|sum|prod|int|alpha|beta|gamma|delta|epsilon|theta|lambda|mu|sigma|pi|tau|phi|omega|chi|psi|hat|bar|mathbf)\b/g;
+  let mMatch;
+  while ((mMatch = macroSoltaRegex.exec(textoPuro)) !== null) {
+    const trecho = textoPuro.slice(Math.max(0, mMatch.index - 15), Math.min(textoPuro.length, mMatch.index + 35)).trim();
+    erros.push({
+      caminho: `${objPath}.macro_solta`,
+      tipo: 'uncompiled_math',
+      formula: trecho,
+      erro: `Fórmula ou símbolo matemático não delimitado por $ ou $$: "${mMatch[0]}"`
+    });
+  }
 }
 
 function percorrerRecursivo(obj, objPath = 'root') {

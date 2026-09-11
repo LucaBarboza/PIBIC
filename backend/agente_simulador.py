@@ -121,7 +121,8 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
         .replace(/[\x08\u0008]eta/g, bslash + 'beta')
         .replace(/[\x08\u0008]inom/g, bslash + 'binom')
         .replace(/[\x08\u0008]mathbf/g, bslash + 'mathbf')
-        .replace(/\t(ext|au|heta|imes)/g, bslash + '$1');
+        .replace(/\t(ext|au|heta|imes)/g, bslash + '$1')
+        .replace(/(?<![\\f\x0c\u000c])rac\\{/g, bslash + 'frac{');
 
       // 2. Corrige potências e subscritos compostos sem chaves (ex: phi^|h| -> phi^{|h|}, e^-x -> e^{-x})
       res = res
@@ -170,14 +171,11 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
     let lastSentHeight = 0;
     function emitirAltura() {
       const root = document.getElementById('simulador-root');
-      if (!root) return;
-
-      const rect = root.getBoundingClientRect();
-      const hContent = Math.ceil(rect.height || root.offsetHeight || 0);
+      const hRoot = root ? Math.ceil(root.getBoundingClientRect().height || root.offsetHeight || 0) : 0;
       const hBody = document.body ? Math.ceil(document.body.scrollHeight || 0) : 0;
       const hDoc = document.documentElement ? Math.ceil(document.documentElement.scrollHeight || 0) : 0;
-      const hReal = Math.max(hContent, hBody, hDoc);
-      const alturaFinal = Math.min(Math.max(hReal + 50, 600), 2400);
+      const hContent = Math.max(hRoot, hBody, hDoc, 750);
+      const alturaFinal = Math.min(Math.max(hContent + 60, 750), 2800);
 
       if (Math.abs(alturaFinal - lastSentHeight) >= 3) {
         lastSentHeight = alturaFinal;
@@ -193,11 +191,15 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
         const rootEl = document.getElementById('simulador-root') || document.body;
         processarNosDeTextoParaLatex(rootEl);
         if (window.renderMathInElement) {
+          const bslash = String.fromCharCode(92);
           renderMathInElement(rootEl, {
             delimiters: [
               {left: '$$', right: '$$', display: true},
-              {left: '$', right: '$', display: false}
+              {left: '$', right: '$', display: false},
+              {left: bslash + '(', right: bslash + ')', display: false},
+              {left: bslash + '[', right: bslash + ']', display: true}
             ],
+            ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error"],
             throwOnError: false
           });
         }
