@@ -17,17 +17,18 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
     if (!rawHtml) return rawHtml;
 
     // 1. Cura preventiva de sintaxe LaTeX em simuladores já persistidos (ex: \phi^|h| -> \phi^{|h|})
+    // 1. Cura preventiva de sintaxe LaTeX em simuladores já persistidos (ex: \phi^|h| -> \phi^{|h|})
     let sanitizado = rawHtml
       .replace(/\^\|([^|]+)\|/g, '^{|$1|}')
       .replace(/_\|([^|]+)\|/g, '_{|$1|}');
 
     // 2. Cura preventiva contra erros de escape de backslash em simuladores legados no Firestore
     sanitizado = sanitizado
-      .replace(/val\.includes\('\\'\)/g, "val.indexOf(String.fromCharCode(92)) !== -1")
-      .replace(/val\.includes\('\\\\'\)/g, "val.indexOf(String.fromCharCode(92)) !== -1")
-      .replace(/val\.includes\('\t'\)/g, "val.indexOf('\\t') !== -1")
-      .replace(/val\.includes\('\x0c'\)/g, "val.indexOf('\\x0c') !== -1")
-      .replace(/val\.includes\('\x08'\)/g, "val.indexOf('\\x08') !== -1");
+      .split("val.includes('\\')").join("val.indexOf(String.fromCharCode(92)) !== -1")
+      .split("val.includes('\\\\')").join("val.indexOf(String.fromCharCode(92)) !== -1")
+      .split("val.includes('\t')").join("val.indexOf('\\t') !== -1")
+      .split("val.includes('\x0c')").join("val.indexOf('\\x0c') !== -1")
+      .split("val.includes('\x08')").join("val.indexOf('\\x08') !== -1");
 
     const antiScrollAndResizeScript = `
       <style>
@@ -35,13 +36,12 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
           height: auto !important;
           min-height: 0 !important;
           max-height: none !important;
-          overflow-y: hidden !important;
           overflow-x: hidden !important;
           margin: 0 !important;
-          padding: 8px 12px 16px 12px !important;
+          padding: 8px 12px 24px 12px !important;
         }
         #simulador-root {
-          padding-bottom: 4px !important;
+          padding-bottom: 8px !important;
           margin-bottom: 0 !important;
         }
         /* Erradica barras de rolagem em KaTeX, Fórmulas e Textos no Simulador */
@@ -81,10 +81,12 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
         (function() {
           function recalcularAlturaSegura() {
             var root = document.getElementById('simulador-root');
-            if (!root) return;
-            var rect = root.getBoundingClientRect();
-            var h = Math.ceil(rect.height || root.offsetHeight || 600);
-            var finalH = Math.min(Math.max(h + 30, 500), 1600);
+            var hRoot = root ? Math.ceil(root.getBoundingClientRect().height || root.offsetHeight || 0) : 0;
+            var hBody = document.body ? Math.ceil(document.body.scrollHeight || 0) : 0;
+            var hDoc = document.documentElement ? Math.ceil(document.documentElement.scrollHeight || 0) : 0;
+            var h = Math.max(hRoot, hBody, hDoc);
+            if (!h) h = 850;
+            var finalH = Math.min(Math.max(h + 50, 600), 2400);
             if (Math.abs(finalH - (window.__lastSentSafeH || 0)) >= 3) {
               window.__lastSentSafeH = finalH;
               window.parent.postMessage({ type: 'simulador_resize', height: finalH }, '*');
@@ -145,7 +147,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   const [html, setHtml] = useState<string | null>(htmlCode ? prepararHtmlSimulador(htmlCode) : null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [iframeHeight, setIframeHeight] = useState(720);
+  const [iframeHeight, setIframeHeight] = useState(880);
 
   useEffect(() => {
     if (htmlCode) {
@@ -159,8 +161,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data && (event.data.type === 'simulador_resize' || event.data.type === 'resize') && event.data.height) {
-        // Trava estrita de altura baseada apenas no conteúdo de simulador-root (evita ratchet infinito até 3500px)
-        const h = Math.min(Math.max(Number(event.data.height), 500), 1600);
+        const h = Math.min(Math.max(Number(event.data.height), 600), 2400);
         setIframeHeight(h);
       }
     };
@@ -226,7 +227,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
         style={{ height: `${iframeHeight}px`, width: '100%', border: 'none', display: 'block' }}
         className="w-full border-none bg-white transition-all duration-200"
         sandbox="allow-scripts allow-same-origin"
-        scrolling="no"
+        scrolling="auto"
         title="Simulador Interativo"
       />
     </div>
