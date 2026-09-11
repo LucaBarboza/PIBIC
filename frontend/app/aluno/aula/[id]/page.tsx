@@ -88,12 +88,10 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   const prepararHtmlSimulador = (rawHtml: string): string => {
     if (!rawHtml) return rawHtml;
 
-    // 1. Remove os cards de dentro do iframe (para não sobrecarregar e evitar conflitos no iframe)
+    // 1. Oculta os cards redundantes com IDs canônicos se presentes
     let sanitizado = rawHtml
-      .replace(/<!-- Card de F[oó]rmula[^>]*-->[\s\S]*?<\/div>\s*<\/div>/i, '')
-      .replace(/<div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm[^"]*">[\s\S]*?<span[^>]*>Modelo Matem[aá]tico[\s\S]*?<\/div>\s*<\/div>/i, '')
-      .replace(/<!-- Card de Explica[cç][aã]o Pedag[oó]gica[^>]*-->[\s\S]*?<\/div>\s*<\/div>/i, '<div id="explicacao_dinamica" class="katex-ignore" style="display:none;"></div>')
-      .replace(/<div class="bg-indigo-50[\s\S]*?<div id="explicacao_dinamica"[\s\S]*?<\/div>\s*<\/div>/i, '<div id="explicacao_dinamica" class="katex-ignore" style="display:none;"></div>');
+      .replace(/<div id="card_modelo_matematico"[\s\S]*?<\/div>\s*<\/div>/i, '')
+      .replace(/<div id="card_explicacao_pedagogica"[\s\S]*?<div id="explicacao_dinamica"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/i, '<div id="explicacao_dinamica" class="katex-ignore" style="display:none;"></div>');
 
     // 2. Cura preventiva contra erros de escape de backslash em simuladores legados
     sanitizado = sanitizado
@@ -168,10 +166,20 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
           overflow-x: hidden !important;
           margin: 0 !important;
           padding: 8px 12px 16px 12px !important;
+          display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
         }
         #simulador-root {
           padding-bottom: 4px !important;
           margin-bottom: 0 !important;
+          display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+        }
+        #card_modelo_matematico,
+        #card_explicacao_pedagogica {
+          display: none !important;
         }
         /* Erradica barras de rolagem em KaTeX, Fórmulas e Textos no Simulador */
         .katex, .katex-display, .katex-html, .katex *, 
@@ -362,23 +370,34 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
           throwOnError: false
         });
       }
-      // Oculta os blocos de modelo matemático e interpretação pedagógica do DOM do iframe
-      const allDivs = doc.querySelectorAll('div, span');
-      allDivs.forEach((el) => {
-        const txt = el.textContent || '';
-        if (txt.includes('Modelo Matemático do Laboratório')) {
-          const card = el.closest('.rounded-xl') || el.parentElement;
-          if (card && card.id !== 'simulador-root') {
-            (card as HTMLElement).style.setProperty('display', 'none', 'important');
+      // Oculta exclusivamente os cards redundantes de fórmula e explicação que estejam dentro do iframe
+      const rootEl = doc.getElementById('simulador-root');
+      if (rootEl) {
+        Array.from(rootEl.children).forEach((child) => {
+          // NUNCA oculta o container do gráfico, o painel de controles ou o cabeçalho
+          if (child.querySelector('#grafico') || child.querySelector('input, select') || child.querySelector('h3') || child.id === 'grafico') {
+            return;
           }
-        }
-        if (txt.includes('💡 Interpretação Pedagógica:') || txt.includes('Interpretação Pedagógica:')) {
-          const card = el.closest('.rounded-xl') || el.parentElement;
-          if (card && card.id !== 'simulador-root') {
-            (card as HTMLElement).style.setProperty('display', 'none', 'important');
+          const txt = child.textContent || '';
+          if (txt.includes('Modelo Matemático do Laboratório') || txt.includes('Interpretação Pedagógica:') || txt.includes('💡 Interpretação Pedagógica:')) {
+            (child as HTMLElement).style.setProperty('display', 'none', 'important');
           }
+        });
+      }
+
+      // Garante incondicionalmente que o body e o simulador-root NUNCA fiquem ocultos
+      if (doc.body) {
+        doc.body.style.removeProperty('display');
+        if (doc.body.style.display === 'none') {
+          doc.body.style.display = 'block';
         }
-      });
+      }
+      if (rootEl) {
+        rootEl.style.removeProperty('display');
+        if (rootEl.style.display === 'none') {
+          rootEl.style.display = 'block';
+        }
+      }
 
       if (typeof (win as any).renderizarLatex === 'function') {
         (win as any).renderizarLatex();

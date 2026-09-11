@@ -94,7 +94,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
     __BLOCO_FORMULA_CARD__
 
     <!-- Card de Explicação Pedagógica Dinâmica -->
-    <div class="bg-indigo-50/60 border border-indigo-100 p-4 sm:p-5 rounded-xl text-slate-700 shadow-sm mb-4 pb-3">
+    <div id="card_explicacao_pedagogica" class="bg-indigo-50/60 border border-indigo-100 p-4 sm:p-5 rounded-xl text-slate-700 shadow-sm mb-4 pb-3">
       <div class="flex items-center gap-2 mb-2">
         <span class="text-indigo-600 font-bold text-sm">💡 Interpretação Pedagógica:</span>
       </div>
@@ -516,7 +516,7 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, contexto_subtopico
             if not formula_limpa.startswith("$$") and not formula_limpa.startswith("$"):
                 formula_limpa = f"$${formula_limpa}$$"
             bloco_formula_card = f"""
-    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center">
+    <div id="card_modelo_matematico" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-center">
       <span class="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-1">Modelo Matemático do Laboratório</span>
       <div class="text-sm sm:text-base font-semibold text-slate-800">
         {formula_limpa}
