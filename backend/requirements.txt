@@ -5,3 +5,4 @@ google-genai
 pydantic
 python-dotenv
 python-multipart
+json_repair>=0.63.4

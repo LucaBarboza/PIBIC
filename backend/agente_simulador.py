@@ -372,7 +372,7 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, contexto_subtopico
             logger.log("Agente Simulador: Programando a interface no design system UFBA...", "info")
         
         def chamar_simulador():
-            return client.models.generate_content(
+            resp = client.models.generate_content(
                 model=modelo_alvo,
                 contents=prompt,
                 config=types.GenerateContentConfig(
@@ -380,8 +380,14 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, contexto_subtopico
                     response_schema=ComponenteSimulador
                 )
             )
+            from latex_sanitizer import safe_json_loads
+            parsed = safe_json_loads(resp.text)
+            if not isinstance(parsed, dict):
+                raise ValueError("Resposta do modelo não pôde ser convertida em dicionário JSON.")
+            comp_obj = ComponenteSimulador.model_validate(parsed)
+            return comp_obj, resp.text
 
-        resposta = executar_chamada_com_retry(
+        comp, resposta_raw = executar_chamada_com_retry(
             chamar_simulador,
             max_retries=5,
             logger=logger,
@@ -390,8 +396,6 @@ def gerar_simulador_html(tema_aula: str, nome_simulador: str, contexto_subtopico
             tracker=tracker,
             modelo=modelo_alvo
         )
-        
-        comp = ComponenteSimulador.model_validate_json(resposta.text)
         
         # Monta card de fórmula (embaixo do gráfico em card dedicado)
         bloco_formula_card = ""

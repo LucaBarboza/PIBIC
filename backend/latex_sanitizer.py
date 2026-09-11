@@ -225,12 +225,18 @@ def safe_json_loads(text: str):
     """
     Carrega JSON de forma ultra-resiliente contra sequências de escape do LaTeX,
     como \\underline, \\upsilon (que quebram no json.loads padrão com 'Invalid \\uXXXX escape'),
-    além de comandos como \\frac, \\beta, \\text, \\times, etc.
+    além de comandos como \\frac, \\beta, \\text, \\times, aspas internas ou strings truncadas.
     """
     if not text or not isinstance(text, str):
         return {}
     
-    # 1. Pré-tratamento de comandos LaTeX comuns que colidem com escapes JSON (\\u, \\f, \\b, \\t)
+    # 1. Tenta parse direto mais rápido se o JSON já estiver perfeito
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    
+    # 2. Pré-tratamento de comandos LaTeX comuns que colidem com escapes JSON (\\u, \\f, \\b, \\t)
     # \\u que não seja seguido de 4 dígitos hexadecimais (ex: \\underline, \\upsilon, \\url)
     t = re.sub(r'(?<!\\)\\u(?![0-9a-fA-F]{4})', r'\\\\u', text)
     t = re.sub(r'(?<!\\)\\f(rac|lat)', r'\\\\f\1', t)
@@ -242,10 +248,27 @@ def safe_json_loads(text: str):
     except Exception:
         pass
     
-    # 2. Corrige qualquer outro backslash solto que não seja escape JSON válido
+    # 3. Corrige qualquer outro backslash solto que não seja escape JSON válido
     t = re.sub(r'(?<!\\)\\(?![\\"/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', t)
     try:
-        return json.loads(t)
+        return json.loads(t, strict=False)
+    except Exception:
+        pass
+        
+    # 4. Motor de auto-reparo profundo (json_repair) para aspas não escapadas, strings não terminadas ou delimitadores ausentes
+    try:
+        import json_repair
+        repaired = json_repair.loads(t)
+        if isinstance(repaired, (dict, list)):
+            return repaired
+    except Exception:
+        pass
+        
+    try:
+        import json_repair
+        repaired_raw = json_repair.loads(text)
+        if isinstance(repaired_raw, (dict, list)):
+            return repaired_raw
     except Exception:
         pass
     
