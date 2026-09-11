@@ -24,12 +24,64 @@ if (typeof window !== 'undefined') {
   (window as any).renderMathInElement = autoRenderFunc;
 }
 
+function htmlToMarkdown(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<p[^>]*>/gi, '')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '**$1**')
+    .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, '**$1**')
+    .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, '*$1*')
+    .replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, '*$1*')
+    .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n')
+    .replace(/<ul[^>]*>/gi, '\n')
+    .replace(/<\/ul>/gi, '\n')
+    .replace(/<ol[^>]*>/gi, '\n')
+    .replace(/<\/ol>/gi, '\n')
+    .replace(/<div[^>]*>/gi, '')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<span[^>]*>/gi, '')
+    .replace(/<\/span>/gi, '')
+    .trim();
+}
+
 function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: string, nomeSimulador: string, htmlCode?: string }) {
+  const [formulaMatematica, setFormulaMatematica] = useState<string | null>(() => {
+    if (!htmlCode) return null;
+    const m = htmlCode.match(/<span[^>]*>Modelo Matem[aá]tico[^<]*<\/span>[\s\S]*?<div class="[^"]*font-semibold[^"]*">([\s\S]*?)<\/div>/i);
+    return m ? m[1].trim() : null;
+  });
+
+  const [explicacaoDinamica, setExplicacaoDinamica] = useState<string | null>(() => {
+    if (!htmlCode) return null;
+    const m = htmlCode.match(/<div id="explicacao_dinamica"[^>]*>([\s\S]*?)<\/div>/i);
+    return m ? htmlToMarkdown(m[1].trim()) : null;
+  });
+
   const prepararHtmlSimulador = (rawHtml: string) => {
     if (!rawHtml) return rawHtml;
 
-    // 1. Cura preventiva contra erros de escape de backslash ou corrupções em simuladores legados no Firestore
+    // 0. Extração de Conteúdos dos Cards para renderização nativa no React
+    const mFormula = rawHtml.match(/<span[^>]*>Modelo Matem[aá]tico[^<]*<\/span>[\s\S]*?<div class="[^"]*font-semibold[^"]*">([\s\S]*?)<\/div>/i);
+    if (mFormula) {
+      setFormulaMatematica(mFormula[1].trim());
+    }
+
+    const mExp = rawHtml.match(/<div id="explicacao_dinamica"[^>]*>([\s\S]*?)<\/div>/i);
+    if (mExp) {
+      setExplicacaoDinamica(htmlToMarkdown(mExp[1].trim()));
+    }
+
+    // 1. Remove os cards de dentro do iframe (para não sobrecarregar e evitar conflitos no iframe)
     let sanitizado = rawHtml
+      .replace(/<!-- Card de F[oó]rmula[^>]*-->[\s\S]*?<\/div>\s*<\/div>/i, '')
+      .replace(/<div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm[^"]*">[\s\S]*?<span[^>]*>Modelo Matem[aá]tico[\s\S]*?<\/div>\s*<\/div>/i, '')
+      .replace(/<!-- Card de Explica[cç][aã]o Pedag[oó]gica[^>]*-->[\s\S]*?<\/div>\s*<\/div>/i, '<div id="explicacao_dinamica" style="display:none;"></div>')
+      .replace(/<div class="bg-indigo-50[\s\S]*?<div id="explicacao_dinamica"[\s\S]*?<\/div>\s*<\/div>/i, '<div id="explicacao_dinamica" style="display:none;"></div>');
+
+    // 2. Cura preventiva contra erros de escape de backslash em simuladores legados
+    sanitizado = sanitizado
       .split("val.includes('^{|') |}|").join("val.indexOf('^|') !== -1")
       .split("val.includes('\\')").join("val.indexOf(String.fromCharCode(92)) !== -1")
       .split("val.includes('\\\\')").join("val.indexOf(String.fromCharCode(92)) !== -1")
@@ -37,7 +89,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
       .split("val.includes('\x0c')").join("val.indexOf('\\x0c') !== -1")
       .split("val.includes('\x08')").join("val.indexOf('\\x08') !== -1");
 
-    // 2. Normalização de Layout Plotly Anti-Sobreposição (Padrão Visual UFBA)
+    // 3. Normalização de Layout Plotly Anti-Sobreposição (Padrão Visual UFBA)
     sanitizado = sanitizado
       .replace(/legend:\s*\{\s*orientation:\s*['"]h['"],\s*y:\s*1\.\d+[^}]*\}/g, 'legend: { orientation: "h", y: -0.22, x: 0.5, xanchor: "center" }')
       .replace(/y:\s*1\.(?:15|1|2|25)/g, 'y: -0.22, x: 0.5, xanchor: "center"')
@@ -75,20 +127,6 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
       return t;
     };
 
-    // 3. Higienização de rótulos do Plotly para não exibir $ crus em SVG
-    sanitizado = sanitizado.replace(/((?:name|title|text))\s*:\s*([`'"])([\s\S]*?)\2/g, (match, prefix, quote, content) => {
-      let interpolacoes: string[] = [];
-      const conteudoProtegido = content.replace(/\$\{[^}]+\}/g, (im: string) => {
-        interpolacoes.push(im);
-        return `__INTERP_${interpolacoes.length - 1}__`;
-      });
-      let limpo = traduzirLatexParaUnicode(conteudoProtegido);
-      interpolacoes.forEach((interp, i) => {
-        limpo = limpo.replace(`__INTERP_${i}__`, interp);
-      });
-      return `${prefix}: ${quote}${limpo}${quote}`;
-    });
-
     // 4. Limpeza de rótulos em tags <option> (menus suspensos nativos não suportam KaTeX)
     sanitizado = sanitizado.replace(/<option\b([^>]*)>([\s\S]*?)<\/option>/gi, (match, attrs, content) => {
       const limpo = traduzirLatexParaUnicode(content);
@@ -97,24 +135,6 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
 
     // 5. Limpeza de rótulos de sliders ($n$): -> (n):
     sanitizado = sanitizado.replace(/\(\$([a-zA-Z0-9_]+)\$\):/g, '($1):');
-
-    // 5.5. Pré-renderização síncrona do Card 'Modelo Matemático do Laboratório' com KaTeX puro
-    sanitizado = sanitizado.replace(
-      /(<div[^>]*class="[^"]*font-semibold text-slate-800[^"]*"[^>]*>)([\s\S]*?)(<\/div>)/gi,
-      (match, openTag, content, closeTag) => {
-        const renderizado = content.replace(/\$([^\$]+)\$/g, (_: string, formula: string) => {
-          try {
-            if (katexObj && typeof katexObj.renderToString === 'function') {
-              return katexObj.renderToString(formula.trim(), { displayMode: false, throwOnError: false });
-            }
-            return `$${formula}$`;
-          } catch (e) {
-            return `$${formula}$`;
-          }
-        });
-        return `${openTag}${renderizado}${closeTag}`;
-      }
-    );
 
     // 6. Aponta KaTeX para o servidor local Next.js (/vendor/katex) com carregamento instantâneo
     if (!sanitizado.includes('/vendor/katex/katex.min.js')) {
@@ -178,8 +198,8 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
             var hRoot = root ? Math.ceil(root.getBoundingClientRect().height || root.offsetHeight || 0) : 0;
             var hBody = document.body ? Math.ceil(document.body.scrollHeight || 0) : 0;
             var hDoc = document.documentElement ? Math.ceil(document.documentElement.scrollHeight || 0) : 0;
-            var h = Math.max(hRoot, hBody, hDoc, 800);
-            var finalH = Math.min(Math.max(h + 70, 750), 2800);
+            var h = Math.max(hRoot, hBody, hDoc, 500);
+            var finalH = Math.min(Math.max(h + 40, 500), 1600);
             if (Math.abs(finalH - (window.__lastSentSafeH || 0)) >= 3) {
               window.__lastSentSafeH = finalH;
               window.parent.postMessage({ type: 'simulador_resize', height: finalH }, '*');
@@ -260,6 +280,24 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
             });
             moSafe.observe(rootTarget, { childList: true, subtree: true, characterData: true });
           }
+
+          // Sincroniza dinamicamente qualquer alteração de texto em explicacao_dinamica com o React pai
+          var expEl = document.getElementById('explicacao_dinamica');
+          if (expEl && window.parent && window.parent !== window) {
+            var ultTexto = '';
+            function emitirExplicacao() {
+              var cur = expEl.innerHTML || expEl.innerText;
+              if (cur && cur !== ultTexto) {
+                ultTexto = cur;
+                window.parent.postMessage({ type: 'simulador_explicacao', texto: cur }, '*');
+              }
+            }
+            if (window.MutationObserver) {
+              var moExp = new MutationObserver(emitirExplicacao);
+              moExp.observe(expEl, { childList: true, subtree: true, characterData: true });
+            }
+          }
+
           document.addEventListener('input', function() {
             setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 30);
           }, true);
@@ -288,7 +326,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   const [html, setHtml] = useState<string | null>(htmlCode ? prepararHtmlSimulador(htmlCode) : null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [iframeHeight, setIframeHeight] = useState(1150);
+  const [iframeHeight, setIframeHeight] = useState(620);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const executarKatexNoIframe = () => {
@@ -299,7 +337,6 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
       const win = iframe.contentWindow;
       if (!doc || !win) return;
 
-      // Injeta instâncias pai do KaTeX diretamente na janela do iframe (0ms de latência)
       (win as any).katex = (window as any).katex || katexObj;
       (win as any).renderMathInElement = (window as any).renderMathInElement || autoRenderFunc;
 
@@ -330,7 +367,6 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
     if (htmlCode) {
       setHtml(prepararHtmlSimulador(htmlCode));
     } else if (!html && !loading && !error) {
-      // Dispara automaticamente a geração em tempo real se ainda não foi gerado
       carregarSimulador();
     }
   }, [htmlCode]);
@@ -350,8 +386,11 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'simulador_explicacao' && event.data.texto) {
+        setExplicacaoDinamica(htmlToMarkdown(event.data.texto));
+      }
       if (event.data && (event.data.type === 'simulador_resize' || event.data.type === 'resize') && event.data.height) {
-        const h = Math.min(Math.max(Number(event.data.height), 750), 2800);
+        const h = Math.min(Math.max(Number(event.data.height), 480), 1600);
         setIframeHeight(h);
         executarKatexNoIframe();
       }
@@ -404,25 +443,58 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   }
 
   return (
-    <div className="my-8 border border-slate-200 rounded-xl overflow-hidden shadow-lg bg-white">
-      <div className="bg-slate-800 text-slate-100 px-4 py-3 flex justify-between items-center">
-        <div className="font-bold text-sm flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-red-500"></span>
-          <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-          <span className="w-3 h-3 rounded-full bg-green-500"></span>
-          <span className="ml-2 text-slate-300">Lab Virtual: {nomeSimulador}</span>
+    <div className="my-8 space-y-4">
+      {/* 1. Card de Modelo Matemático (FORA da caixa do simulador, compilado nativamente pelo React/KaTeX) */}
+      {formulaMatematica && (
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">
+              Modelo Matemático do Laboratório
+            </span>
+          </div>
+          <div className="text-base sm:text-lg font-semibold text-slate-800 py-1 text-center overflow-x-auto">
+            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+              {formulaMatematica}
+            </ReactMarkdown>
+          </div>
         </div>
+      )}
+
+      {/* 2. Caixa do Simulador (Iframe Enxuto: Apenas Cabeçalho + Controles + Gráfico Plotly) */}
+      <div className="border border-slate-200 rounded-xl overflow-hidden shadow-md bg-white">
+        <div className="bg-slate-800 text-slate-100 px-4 py-3 flex justify-between items-center">
+          <div className="font-bold text-sm flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-red-500"></span>
+            <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+            <span className="w-3 h-3 rounded-full bg-green-500"></span>
+            <span className="ml-2 text-slate-300">Lab Virtual: {nomeSimulador}</span>
+          </div>
+        </div>
+        <iframe 
+          ref={iframeRef}
+          srcDoc={html!}
+          onLoad={executarKatexNoIframe}
+          style={{ height: `${iframeHeight}px`, width: '100%', border: 'none', display: 'block' }}
+          className="w-full border-none bg-white transition-all duration-200"
+          sandbox="allow-scripts allow-same-origin"
+          scrolling="auto"
+          title="Simulador Interativo"
+        />
       </div>
-      <iframe 
-        ref={iframeRef}
-        srcDoc={html!}
-        onLoad={executarKatexNoIframe}
-        style={{ height: `${iframeHeight}px`, width: '100%', border: 'none', display: 'block' }}
-        className="w-full border-none bg-white transition-all duration-200"
-        sandbox="allow-scripts allow-same-origin"
-        scrolling="auto"
-        title="Simulador Interativo"
-      />
+
+      {/* 3. Card de Interpretação Pedagógica (FORA da caixa do simulador, compilado nativamente pelo React/KaTeX) */}
+      {explicacaoDinamica && (
+        <div className="bg-indigo-50/70 border border-indigo-100 p-4 sm:p-5 rounded-xl text-slate-700 shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-indigo-600 font-bold text-sm">💡 Interpretação Pedagógica:</span>
+          </div>
+          <div className="text-sm leading-relaxed text-slate-700 space-y-1.5 prose prose-slate max-w-none">
+            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+              {explicacaoDinamica}
+            </ReactMarkdown>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

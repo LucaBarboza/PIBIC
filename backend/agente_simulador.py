@@ -174,8 +174,8 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       const hRoot = root ? Math.ceil(root.getBoundingClientRect().height || root.offsetHeight || 0) : 0;
       const hBody = document.body ? Math.ceil(document.body.scrollHeight || 0) : 0;
       const hDoc = document.documentElement ? Math.ceil(document.documentElement.scrollHeight || 0) : 0;
-      const hContent = Math.max(hRoot, hBody, hDoc, 750);
-      const alturaFinal = Math.min(Math.max(hContent + 60, 750), 2800);
+      const hContent = Math.max(hRoot, hBody, hDoc, 500);
+      const alturaFinal = Math.min(Math.max(hContent + 40, 500), 1600);
 
       if (Math.abs(alturaFinal - lastSentHeight) >= 3) {
         lastSentHeight = alturaFinal;

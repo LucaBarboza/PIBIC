@@ -370,20 +370,13 @@ def sanitizar_layout_e_renderizacao_simulador(html: str) -> str:
 
     def limpar_dolares_plotly(m):
         prefix = m.group(1)
-        quote = m.group(2)
-        conteudo = m.group(3)
-        # Se for template string JS (`...`), protege as interpolações ${...} antes de traduzir
-        interpolacoes = []
-        def salvar_interpolacao(im):
-            interpolacoes.append(im.group(0))
-            return f"__INTERP_{len(interpolacoes) - 1}__"
-        conteudo_protegido = re.sub(r'\$\{[^}]+\}', salvar_interpolacao, conteudo)
-        limpo = traduzir_latex_para_unicode(conteudo_protegido)
-        for i, interp in enumerate(interpolacoes):
-            limpo = limpo.replace(f"__INTERP_{i}__", interp)
-        return f"{prefix}: {quote}{limpo}{quote}"
+        conteudo = m.group(2)
+        limpo = re.sub(r'\$([^\$]+)\$', r'\1', conteudo)
+        limpo = re.sub(r'([A-Za-z]+)_\{([^}]+)\}', r'\1(\2)', limpo)
+        limpo = re.sub(r'([A-Za-z]+)_([a-zA-Z0-9])', r'\1(\2)', limpo)
+        return f"{prefix}: '{limpo}'"
 
-    h = re.sub(r"((?:name|title|text))\s*:\s*([`'\"])([\s\S]*?)\2", limpar_dolares_plotly, h)
+    h = re.sub(r"(name|title)\s*:\s*'([^']+)'", limpar_dolares_plotly, h)
 
     # 5. Garante links locais para KaTeX no <head> com fallback CDN
     if '/vendor/katex/katex.min.js' not in h:
