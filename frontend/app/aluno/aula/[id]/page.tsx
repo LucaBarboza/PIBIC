@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { doc, onSnapshot, collection, getDocs } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -46,31 +46,32 @@ function htmlToMarkdown(html: string): string {
 }
 
 function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: string, nomeSimulador: string, htmlCode?: string }) {
-  const [formulaMatematica, setFormulaMatematica] = useState<string | null>(() => {
+  // 1. Extração segura do Modelo Matemático (imutável por simulação, sem re-render loop)
+  const formulaMatematica = useMemo(() => {
     if (!htmlCode) return null;
     const m = htmlCode.match(/<span[^>]*>Modelo Matem[aá]tico[^<]*<\/span>[\s\S]*?<div class="[^"]*font-semibold[^"]*">([\s\S]*?)<\/div>/i);
     return m ? m[1].trim() : null;
-  });
+  }, [htmlCode]);
 
+  // 2. Extração segura da Explicação Dinâmica com suporte a postMessage em tempo real
   const [explicacaoDinamica, setExplicacaoDinamica] = useState<string | null>(() => {
     if (!htmlCode) return null;
     const m = htmlCode.match(/<div id="explicacao_dinamica"[^>]*>([\s\S]*?)<\/div>/i);
     return m ? htmlToMarkdown(m[1].trim()) : null;
   });
 
-  const prepararHtmlSimulador = (rawHtml: string) => {
+  useEffect(() => {
+    if (htmlCode) {
+      const m = htmlCode.match(/<div id="explicacao_dinamica"[^>]*>([\s\S]*?)<\/div>/i);
+      if (m) {
+        setExplicacaoDinamica(htmlToMarkdown(m[1].trim()));
+      }
+    }
+  }, [htmlCode]);
+
+  // Função pura de sanitização do iframe (sem efeitos colaterais de setState)
+  const prepararHtmlSimulador = (rawHtml: string): string => {
     if (!rawHtml) return rawHtml;
-
-    // 0. Extração de Conteúdos dos Cards para renderização nativa no React
-    const mFormula = rawHtml.match(/<span[^>]*>Modelo Matem[aá]tico[^<]*<\/span>[\s\S]*?<div class="[^"]*font-semibold[^"]*">([\s\S]*?)<\/div>/i);
-    if (mFormula) {
-      setFormulaMatematica(mFormula[1].trim());
-    }
-
-    const mExp = rawHtml.match(/<div id="explicacao_dinamica"[^>]*>([\s\S]*?)<\/div>/i);
-    if (mExp) {
-      setExplicacaoDinamica(htmlToMarkdown(mExp[1].trim()));
-    }
 
     // 1. Remove os cards de dentro do iframe (para não sobrecarregar e evitar conflitos no iframe)
     let sanitizado = rawHtml
@@ -470,7 +471,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
             </span>
           </div>
           <div className="text-base sm:text-lg font-semibold text-slate-800 py-1 text-center overflow-x-auto">
-            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false }]]}>
               {formulaMatematica}
             </ReactMarkdown>
           </div>
@@ -506,7 +507,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
             <span className="text-indigo-600 font-bold text-sm">💡 Interpretação Pedagógica:</span>
           </div>
           <div className="text-sm leading-relaxed text-slate-700 space-y-1.5 prose prose-slate max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false }]]}>
+            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false }]]}>
               {explicacaoDinamica}
             </ReactMarkdown>
           </div>
