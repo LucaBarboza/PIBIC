@@ -213,8 +213,8 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
             if (!root) return;
             var hRoot = Math.ceil(root.getBoundingClientRect().height || root.offsetHeight || 0);
             if (!hRoot || hRoot < 300) return;
-            var finalH = Math.min(Math.max(hRoot + 16, 520), 720);
-            if (Math.abs(finalH - (window.__lastSentSafeH || 0)) >= 10) {
+            var finalH = Math.min(Math.max(hRoot + 30, 580), 1400);
+            if (Math.abs(finalH - (window.__lastSentSafeH || 0)) >= 8) {
               window.__lastSentSafeH = finalH;
               window.parent.postMessage({ type: 'simulador_resize', height: finalH }, '*');
             }
@@ -332,7 +332,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
   const [html, setHtml] = useState<string | null>(htmlCode ? prepararHtmlSimulador(htmlCode) : null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [iframeHeight, setIframeHeight] = useState(620);
+  const [iframeHeight, setIframeHeight] = useState(850);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const executarKatexNoIframe = () => {
@@ -414,7 +414,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
         setExplicacaoDinamica(htmlToMarkdown(event.data.texto));
       }
       if (event.data && (event.data.type === 'simulador_resize' || event.data.type === 'resize') && event.data.height) {
-        const h = Math.min(Math.max(Number(event.data.height), 520), 720);
+        const h = Math.min(Math.max(Number(event.data.height), 580), 1400);
         setIframeHeight(h);
       }
     };
