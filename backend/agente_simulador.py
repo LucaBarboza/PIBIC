@@ -121,8 +121,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
         .replace(/[\x08\u0008]eta/g, bslash + 'beta')
         .replace(/[\x08\u0008]inom/g, bslash + 'binom')
         .replace(/[\x08\u0008]mathbf/g, bslash + 'mathbf')
-        .replace(/\t(ext|au|heta|imes)/g, bslash + '$1')
-        .replace(/(?<![\\f\x0c\u000c])rac\\{/g, bslash + 'frac{');
+        .replace(/\t(ext|au|heta|imes)/g, bslash + '$1');
 
       // 2. Corrige potências e subscritos compostos sem chaves (ex: phi^|h| -> phi^{|h|}, e^-x -> e^{-x})
       res = res
@@ -173,10 +172,12 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       const root = document.getElementById('simulador-root');
       if (!root) return;
 
-      // Medição estrita do container de conteúdo (NUNCA do document.body ou documentElement para impedir loop ratchet de expansão)
       const rect = root.getBoundingClientRect();
-      const hContent = Math.ceil(rect.height || root.offsetHeight || 600);
-      const alturaFinal = Math.min(Math.max(hContent + 30, 520), 1600);
+      const hContent = Math.ceil(rect.height || root.offsetHeight || 0);
+      const hBody = document.body ? Math.ceil(document.body.scrollHeight || 0) : 0;
+      const hDoc = document.documentElement ? Math.ceil(document.documentElement.scrollHeight || 0) : 0;
+      const hReal = Math.max(hContent, hBody, hDoc);
+      const alturaFinal = Math.min(Math.max(hReal + 50, 600), 2400);
 
       if (Math.abs(alturaFinal - lastSentHeight) >= 3) {
         lastSentHeight = alturaFinal;
@@ -192,13 +193,10 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
         const rootEl = document.getElementById('simulador-root') || document.body;
         processarNosDeTextoParaLatex(rootEl);
         if (window.renderMathInElement) {
-          const bslash = String.fromCharCode(92);
           renderMathInElement(rootEl, {
             delimiters: [
               {left: '$$', right: '$$', display: true},
-              {left: '$', right: '$', display: false},
-              {left: bslash + '(', right: bslash + ')', display: false},
-              {left: bslash + '[', right: bslash + ']', display: true}
+              {left: '$', right: '$', display: false}
             ],
             throwOnError: false
           });

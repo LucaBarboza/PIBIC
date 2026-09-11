@@ -30,6 +30,14 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
       .split("val.includes('\x0c')").join("val.indexOf('\\x0c') !== -1")
       .split("val.includes('\x08')").join("val.indexOf('\\x08') !== -1");
 
+    // 3. Remove delimitadores \( e \[ que estavam virando '(' e '[' e quebrando todos os parênteses
+    sanitizado = sanitizado
+      .replace(/\{\s*left:\s*['"][^'"]*?\(['"],\s*right:\s*['"][^'"]*?\)['"][^}]*\},?/g, '')
+      .replace(/\{\s*left:\s*['"][^'"]*?\[['"],\s*right:\s*['"][^'"]*?\]['"][^}]*\},?/g, '')
+      .replace(/\.replace\(\/\(\?<!\[.*?\]\)rac.*?;/g, ';')
+      .replace(/[\x0c\u000c]+/g, "")
+      .replace(/\\f\s*frac/g, "\\frac");
+
     const antiScrollAndResizeScript = `
       <style>
         html, body {
@@ -85,8 +93,8 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
             var hBody = document.body ? Math.ceil(document.body.scrollHeight || 0) : 0;
             var hDoc = document.documentElement ? Math.ceil(document.documentElement.scrollHeight || 0) : 0;
             var h = Math.max(hRoot, hBody, hDoc);
-            if (!h) h = 850;
-            var finalH = Math.min(Math.max(h + 50, 600), 2400);
+            if (!h) h = 900;
+            var finalH = Math.min(Math.max(h + 50, 650), 2600);
             if (Math.abs(finalH - (window.__lastSentSafeH || 0)) >= 3) {
               window.__lastSentSafeH = finalH;
               window.parent.postMessage({ type: 'simulador_resize', height: finalH }, '*');
@@ -101,9 +109,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
                 window.renderMathInElement(document.getElementById('simulador-root'), {
                   delimiters: [
                     {left: '$$', right: '$$', display: true},
-                    {left: '$', right: '$', display: false},
-                    {left: bslash + '(', right: bslash + ')', display: false},
-                    {left: bslash + '[', right: bslash + ']', display: true}
+                    {left: '$', right: '$', display: false}
                   ],
                   throwOnError: false
                 });
@@ -122,8 +128,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
             var roSafe = new ResizeObserver(function() { recalcularAlturaSegura(); });
             var r = document.getElementById('simulador-root');
             if (r) roSafe.observe(r);
-            var exp = document.getElementById('explicacao_dinamica');
-            if (exp) roSafe.observe(exp);
+            if (document.body) roSafe.observe(document.body);
           }
         })();
       </script>
@@ -144,10 +149,11 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
     return sanitizado;
   };
 
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [html, setHtml] = useState<string | null>(htmlCode ? prepararHtmlSimulador(htmlCode) : null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [iframeHeight, setIframeHeight] = useState(880);
+  const [iframeHeight, setIframeHeight] = useState(1200);
 
   useEffect(() => {
     if (htmlCode) {
@@ -160,8 +166,12 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      // Isola a mensagem exclusivamente para o iframe correspondente a este componente
+      if (iframeRef.current && event.source !== iframeRef.current.contentWindow) {
+        return;
+      }
       if (event.data && (event.data.type === 'simulador_resize' || event.data.type === 'resize') && event.data.height) {
-        const h = Math.min(Math.max(Number(event.data.height), 600), 2400);
+        const h = Math.min(Math.max(Number(event.data.height), 650), 2600);
         setIframeHeight(h);
       }
     };
@@ -195,19 +205,24 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
 
   if (loading) {
     return (
-      <div className="my-8 bg-slate-50 border border-slate-200 rounded-xl p-12 text-center shadow-inner">
-        <RefreshCw className="animate-spin text-indigo-500 mx-auto mb-4" size={32} />
-        <p className="text-slate-600 font-medium animate-pulse">Engenheiro de IA programando o simulador no padrão acadêmico...</p>
-        <p className="text-slate-400 text-sm mt-2">Isso pode levar até 20 segundos (código sendo gerado e validado)</p>
+      <div className="my-8 p-12 border border-indigo-100 rounded-xl bg-indigo-50/30 flex flex-col items-center justify-center space-y-4">
+        <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+        <p className="text-sm font-semibold text-indigo-900">Construindo Simulador Interativo com IA...</p>
+        <p className="text-xs text-indigo-600/70">Programando lógica matemática e interface gráfica</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="my-8 bg-red-50 text-red-600 p-6 rounded-xl border border-red-200 text-center">
-        <p>Ocorreu um erro ao gerar a simulação.</p>
-        <button onClick={carregarSimulador} className="mt-4 underline text-red-800">Tentar Novamente</button>
+      <div className="my-8 p-6 border border-red-200 rounded-xl bg-red-50 text-center">
+        <p className="text-sm text-red-600 font-semibold mb-2">Não foi possível carregar o simulador interativo.</p>
+        <button 
+          onClick={carregarSimulador}
+          className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition"
+        >
+          Tentar Novamente
+        </button>
       </div>
     );
   }
@@ -223,6 +238,7 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
         </div>
       </div>
       <iframe 
+        ref={iframeRef}
         srcDoc={html!}
         style={{ height: `${iframeHeight}px`, width: '100%', border: 'none', display: 'block' }}
         className="w-full border-none bg-white transition-all duration-200"
