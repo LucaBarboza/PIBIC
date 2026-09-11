@@ -25,7 +25,20 @@ if (typeof window !== 'undefined') {
 
 function htmlToMarkdown(html: string): string {
   if (!html) return '';
-  return html
+  let t = html;
+
+  // 1. Se contiver tags MathML geradas pelo KaTeX, recupera a fórmula LaTeX pura preservada em <annotation>
+  t = t.replace(/<math[\s\S]*?<annotation encoding="application\/x-tex">([\s\S]*?)<\/annotation>[\s\S]*?<\/math>/gi, (_, tex) => ' $' + tex.trim() + '$ ');
+
+  // 2. Remove quaisquer tags residuais de KaTeX, MathML e SVG
+  t = t.replace(/<span class="katex-mathml">[\s\S]*?<\/span>/gi, '');
+  t = t.replace(/<span class="katex-html"[\s\S]*?<\/span>/gi, '');
+  t = t.replace(/<span class="katex"[\s\S]*?<\/span>/gi, '');
+  t = t.replace(/<math[\s\S]*?<\/math>/gi, '');
+  t = t.replace(/<svg[\s\S]*?<\/svg>/gi, '');
+
+  // 3. Converte quebras e marcações HTML para Markdown limpo
+  return t
     .replace(/<p[^>]*>/gi, '')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<br\s*\/?>/gi, '\n')
@@ -42,6 +55,8 @@ function htmlToMarkdown(html: string): string {
     .replace(/<\/div>/gi, '\n')
     .replace(/<span[^>]*>/gi, '')
     .replace(/<\/span>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[ \t]+/g, ' ')
     .trim();
 }
 
@@ -77,8 +92,8 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
     let sanitizado = rawHtml
       .replace(/<!-- Card de F[oó]rmula[^>]*-->[\s\S]*?<\/div>\s*<\/div>/i, '')
       .replace(/<div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm[^"]*">[\s\S]*?<span[^>]*>Modelo Matem[aá]tico[\s\S]*?<\/div>\s*<\/div>/i, '')
-      .replace(/<!-- Card de Explica[cç][aã]o Pedag[oó]gica[^>]*-->[\s\S]*?<\/div>\s*<\/div>/i, '<div id="explicacao_dinamica" style="display:none;"></div>')
-      .replace(/<div class="bg-indigo-50[\s\S]*?<div id="explicacao_dinamica"[\s\S]*?<\/div>\s*<\/div>/i, '<div id="explicacao_dinamica" style="display:none;"></div>');
+      .replace(/<!-- Card de Explica[cç][aã]o Pedag[oó]gica[^>]*-->[\s\S]*?<\/div>\s*<\/div>/i, '<div id="explicacao_dinamica" class="katex-ignore" style="display:none;"></div>')
+      .replace(/<div class="bg-indigo-50[\s\S]*?<div id="explicacao_dinamica"[\s\S]*?<\/div>\s*<\/div>/i, '<div id="explicacao_dinamica" class="katex-ignore" style="display:none;"></div>');
 
     // 2. Cura preventiva contra erros de escape de backslash em simuladores legados
     sanitizado = sanitizado
@@ -152,10 +167,10 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
           max-height: none !important;
           overflow-x: hidden !important;
           margin: 0 !important;
-          padding: 8px 12px 24px 12px !important;
+          padding: 8px 12px 16px 12px !important;
         }
         #simulador-root {
-          padding-bottom: 8px !important;
+          padding-bottom: 4px !important;
           margin-bottom: 0 !important;
         }
         /* Erradica barras de rolagem em KaTeX, Fórmulas e Textos no Simulador */
@@ -195,25 +210,23 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
         (function() {
           function recalcularAlturaSegura() {
             var root = document.getElementById('simulador-root');
-            var hRoot = root ? Math.ceil(root.getBoundingClientRect().height || root.offsetHeight || 0) : 0;
-            var hBody = document.body ? Math.ceil(document.body.scrollHeight || 0) : 0;
-            var hDoc = document.documentElement ? Math.ceil(document.documentElement.scrollHeight || 0) : 0;
-            var h = Math.max(hRoot, hBody, hDoc, 500);
-            var finalH = Math.min(Math.max(h + 40, 500), 1600);
-            if (Math.abs(finalH - (window.__lastSentSafeH || 0)) >= 3) {
+            if (!root) return;
+            var hRoot = Math.ceil(root.getBoundingClientRect().height || root.offsetHeight || 0);
+            if (!hRoot || hRoot < 300) return;
+            var finalH = Math.min(Math.max(hRoot + 16, 520), 720);
+            if (Math.abs(finalH - (window.__lastSentSafeH || 0)) >= 10) {
               window.__lastSentSafeH = finalH;
               window.parent.postMessage({ type: 'simulador_resize', height: finalH }, '*');
             }
           }
+
           function reforcarRenderLatex() {
             try {
               var renderMath = (typeof window.renderMathInElement === 'function')
                 ? window.renderMathInElement
                 : (window.parent && typeof window.parent.renderMathInElement === 'function')
                   ? window.parent.renderMathInElement
-                  : (window.parent && window.parent.renderMathInElement && typeof window.parent.renderMathInElement.default === 'function')
-                    ? window.parent.renderMathInElement.default
-                    : null;
+                  : null;
 
               var target = document.getElementById('simulador-root') || document.body;
               if (renderMath && target) {
@@ -227,63 +240,56 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
                     {left: bslash + '(', right: bslash + ')', display: false},
                     {left: bslash + '[', right: bslash + ']', display: true}
                   ],
-                  ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error"],
+                  ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error", "katex-ignore", "sem-katex"],
+                  ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
                   throwOnError: false
                 });
               } else if (typeof window.renderizarLatex === 'function') {
                 window.renderizarLatex();
-              } else {
-                if (!window.__safeLatexRetries) window.__safeLatexRetries = 0;
-                if (window.__safeLatexRetries < 80) {
-                  window.__safeLatexRetries++;
-                  setTimeout(reforcarRenderLatex, 40);
-                }
               }
             } catch (e) {}
           }
+
           reforcarRenderLatex();
           if (document.readyState === 'complete' || document.readyState === 'interactive') {
             reforcarRenderLatex();
             recalcularAlturaSegura();
           }
           window.emitirAltura = recalcularAlturaSegura;
+
           window.addEventListener('load', function() {
             reforcarRenderLatex();
             recalcularAlturaSegura();
-            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 150);
-            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 400);
-            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 800);
-            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 1500);
+            setTimeout(recalcularAlturaSegura, 300);
+            setTimeout(recalcularAlturaSegura, 800);
           });
+
           if (window.ResizeObserver) {
             var roSafe = new ResizeObserver(function() { recalcularAlturaSegura(); });
-            if (document.body) roSafe.observe(document.body);
             var r = document.getElementById('simulador-root');
             if (r) roSafe.observe(r);
-            var exp = document.getElementById('explicacao_dinamica');
-            if (exp) roSafe.observe(exp);
-          }
-          var rootTarget = document.getElementById('simulador-root') || document.body;
-          if (window.MutationObserver && rootTarget) {
-            var timerMut = null;
-            var moSafe = new MutationObserver(function(mutations) {
-              var apenasKatex = mutations.every(function(m) {
-                var t = m.target;
-                return t && t.classList && (t.classList.contains('katex') || t.classList.contains('katex-html'));
-              });
-              if (apenasKatex) return;
-              if (timerMut) clearTimeout(timerMut);
-              timerMut = setTimeout(function() {
-                reforcarRenderLatex();
-                recalcularAlturaSegura();
-              }, 25);
-            });
-            moSafe.observe(rootTarget, { childList: true, subtree: true, characterData: true });
           }
 
-          // Sincroniza dinamicamente qualquer alteração de texto em explicacao_dinamica com o React pai
+          // Sincroniza a explicação dinâmica diretamente no momento em que o script atribui a ela
           var expEl = document.getElementById('explicacao_dinamica');
           if (expEl && window.parent && window.parent !== window) {
+            try {
+              var desc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+              if (desc && desc.set) {
+                Object.defineProperty(expEl, 'innerHTML', {
+                  set: function(val) {
+                    if (val) {
+                      window.parent.postMessage({ type: 'simulador_explicacao', texto: String(val) }, '*');
+                    }
+                    return desc.set.call(this, val);
+                  },
+                  get: function() {
+                    return desc.get.call(this);
+                  }
+                });
+              }
+            } catch (e) {}
+
             var ultTexto = '';
             function emitirExplicacao() {
               var cur = expEl.innerHTML || expEl.innerText;
@@ -299,10 +305,10 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
           }
 
           document.addEventListener('input', function() {
-            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 30);
+            setTimeout(function() { recalcularAlturaSegura(); }, 50);
           }, true);
           document.addEventListener('change', function() {
-            setTimeout(function() { reforcarRenderLatex(); recalcularAlturaSegura(); }, 30);
+            setTimeout(function() { recalcularAlturaSegura(); }, 50);
           }, true);
         })();
       </script>
@@ -408,9 +414,8 @@ function SimuladorInterativo({ temaAula, nomeSimulador, htmlCode }: { temaAula: 
         setExplicacaoDinamica(htmlToMarkdown(event.data.texto));
       }
       if (event.data && (event.data.type === 'simulador_resize' || event.data.type === 'resize') && event.data.height) {
-        const h = Math.min(Math.max(Number(event.data.height), 480), 1600);
+        const h = Math.min(Math.max(Number(event.data.height), 520), 720);
         setIframeHeight(h);
-        executarKatexNoIframe();
       }
     };
     window.addEventListener('message', handleMessage);

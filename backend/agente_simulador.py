@@ -98,7 +98,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
       <div class="flex items-center gap-2 mb-2">
         <span class="text-indigo-600 font-bold text-sm">💡 Interpretação Pedagógica:</span>
       </div>
-      <div id="explicacao_dinamica" class="text-sm leading-relaxed text-slate-700 space-y-1.5">
+      <div id="explicacao_dinamica" class="text-sm leading-relaxed text-slate-700 space-y-1.5 katex-ignore">
         __EXPLICACAO_INICIAL__
       </div>
     </div>
@@ -216,7 +216,7 @@ TEMPLATE_SIMULADOR_UFBA = """<!DOCTYPE html>
             {left: bslash + '(', right: bslash + ')', display: false},
             {left: bslash + '[', right: bslash + ']', display: true}
           ],
-          ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error"],
+          ignoredClasses: ["katex", "katex-html", "katex-mathml", "katex-error", "katex-ignore", "sem-katex"],
           throwOnError: false
         });
       } catch (err) {
